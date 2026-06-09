@@ -1,20 +1,15 @@
-import type { PositionLoader, PositionConfig } from "./types.ts";
+import type { PositionLoader } from "./types.ts";
 import type { PositionState } from "../engine/types.ts";
 import type { KucoinClient } from "../kucoin/mod.ts";
 
-export class KucoinPositionLoader implements PositionLoader {
-  readonly name = "kucoin";
-  readonly config: PositionConfig;
-  private client: KucoinClient;
+export function KucoinPositionLoader(
+  config: { reserveSymbol: string; candleInterval: string; candleRangeMs: number },
+  client: KucoinClient,
+): PositionLoader {
+  const { reserveSymbol, candleInterval, candleRangeMs } = config;
 
-  constructor(config: PositionConfig, client: KucoinClient) {
-    this.config = config;
-    this.client = client;
-  }
-
-  async loadPositions(): Promise<PositionState[]> {
-    const { reserveSymbol, candleInterval, candleRangeMs } = this.config;
-    const balances = await this.client.getBalances();
+  const strategy = async (): Promise<PositionState[]> => {
+    const balances = await client.getBalances();
     const activeBalances = balances.filter(
       (b) => parseFloat(b.available) > 0 && b.currency !== reserveSymbol,
     );
@@ -27,7 +22,7 @@ export class KucoinPositionLoader implements PositionLoader {
     for (const b of activeBalances) {
       const symbol = `${b.currency}-USDT`;
       try {
-        const ticker = await this.client.getTicker(symbol);
+        const ticker = await client.getTicker(symbol);
         const price = ticker.last;
         const size = parseFloat(b.available);
         positions.push({
@@ -39,7 +34,7 @@ export class KucoinPositionLoader implements PositionLoader {
         });
       } catch {
         try {
-          const klines = await this.client.getKlines(
+          const klines = await client.getKlines(
             symbol, candleInterval, now - candleRangeMs, now,
           );
           if (klines.length > 0) {
@@ -60,5 +55,8 @@ export class KucoinPositionLoader implements PositionLoader {
     }
 
     return positions;
-  }
+  };
+
+  Object.defineProperty(strategy, "name", { value: "kucoin" });
+  return strategy;
 }

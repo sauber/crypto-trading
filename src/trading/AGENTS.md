@@ -6,16 +6,15 @@ Timing of swaps via technical indicators.
 
 ```ts
 interface TradingStrategy {
-  readonly name: string;
-  readonly config: TradingConfig;
-  plan(params: {
-    wantToBuy: Array<{ symbol; confidence; reason }>;
-    wantToSell: Array<{ symbol; reason }>;
+  (params: {
+    wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
+    wantToSell: Array<{ symbol: string; reason: string }>;
     activePositions: PositionState[];
     prices: Map<string, number>;
     klines: Map<string, Kline[]>;
-    maxPositions: number;
-  }): Promise<SwapPlan>;
+    targetPositions: number;
+  }): SwapPlan;
+  readonly name: string;
 }
 ```
 
@@ -28,6 +27,8 @@ interface TradingStrategy {
 | `bb-timed` | `bb-timed.ts` | Bollinger Bands(20,2) | Buy near lower band, sell near upper band |
 | `ema-adx-timed` | `ema-adx-timed.ts` | EMA(9,21) + ADX(14) | Buy when EMA9>EMA21 + ADX>25, sell when EMA9<EMA21 |
 
+Trading strategies are synchronous — no `async`/`await`.
+
 ## Config
 
-Each strategy has its own config interface in `<name>.config.ts`.
+Each strategy embeds default parameters in its factory function signature.

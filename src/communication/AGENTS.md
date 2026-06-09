@@ -1,28 +1,51 @@
 # Communication
 
-Report pipeline results and errors.
+Log pipeline events, decisions, and trades.
 
 ## Interface
 
 ```ts
-interface CommunicationStrategy {
+interface LogEntry {
+  timestamp?: string;
+  cycle?: number;
+  action: string;
+  symbol?: string;
+  side?: "buy" | "sell";
+  reason?: string;
+  message: string;
+}
+
+interface Logger {
+  (entry: LogEntry): void;
   readonly name: string;
-  readonly config: CommunicationConfig;
-  report(result: PipelineResult | LiveCycleResult): void;
-  insight(insight: ReflectionInsight): void;
-  error(err: Error): void;
 }
 ```
 
-## Strategies
+## Loggers
 
-| Name | File | Description |
-|------|------|-------------|
-| `silent` | `silent.ts` | No output (backtest mode) |
-| `verbose` | `verbose.ts` | Console output (live mode) |
+| Name | File | Use | Timestamps |
+|------|------|-----|------------|
+| `silent` | `silent.ts` | Optimizing | None |
+| `line-journal` | `line-journal.ts` | Backtest / Live | From caller or `Date.now()` |
+| `dashboard` *(future)* | — | Live trading | Realtime |
 
-## Config
+## Usage
+
+Loggers are passed as a parameter to engine factories:
 
 ```ts
-interface CommunicationConfig { silent: boolean }
+// Backtest
+const logger = LineJournal();
+const result = await pipelineSimulate({ ..., logger });
+
+// Live trading
+const logger = LineJournal();
+const engine = new TradingEngine({ ..., logger });
 ```
+
+## Design notes
+
+- Single-method callable interface (function with `.name` property)
+- Logger implementation determines output verbosity and format
+- Backtest passes kline timestamps; live trading omits timestamps (handled by logger)
+- Future: Dashboard logger with TUI rendering

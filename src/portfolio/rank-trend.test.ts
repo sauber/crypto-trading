@@ -1,10 +1,9 @@
 import { RankTrendPortfolio } from "./rank-trend.ts";
-import { config } from "./rank-trend.config.ts";
 import type { CoinCandidate } from "../discovery/mod.ts";
-import type { PositionState, PortfolioDecision } from "../engine/types.ts";
+import type { PositionState } from "../engine/types.ts";
 
-Deno.test("RankTrendPortfolio identifies improving-rank coins as buys", async () => {
-  const strategy = new RankTrendPortfolio(config);
+Deno.test("RankTrendPortfolio identifies improving-rank coins as buys", () => {
+  const strategy = RankTrendPortfolio(5);
 
   const candidates: CoinCandidate[] = [
     { symbol: "BTC-USDT", score: 1000, reason: "vol" },
@@ -12,14 +11,7 @@ Deno.test("RankTrendPortfolio identifies improving-rank coins as buys", async ()
     { symbol: "SOL-USDT", score: 600, reason: "vol" },
   ];
 
-  let decision = await strategy.analyze({
-    candidates,
-    activePositions: [],
-    prices: new Map(),
-    client: undefined as any,
-    interval: "1hour",
-    candleRangeMs: 0,
-  });
+  let decision = strategy([], candidates);
 
   if (decision.wantToBuy.length !== 0) {
     throw new Error(
@@ -33,14 +25,7 @@ Deno.test("RankTrendPortfolio identifies improving-rank coins as buys", async ()
     { symbol: "BTC-USDT", score: 400, reason: "vol" },
   ];
 
-  decision = await strategy.analyze({
-    candidates: candidates2,
-    activePositions: [],
-    prices: new Map(),
-    client: undefined as any,
-    interval: "1hour",
-    candleRangeMs: 0,
-  });
+  decision = strategy([], candidates2);
 
   const buySymbols = decision.wantToBuy.map((b) => b.symbol);
   if (!buySymbols.includes("SOL-USDT")) {
@@ -55,39 +40,25 @@ Deno.test("RankTrendPortfolio identifies improving-rank coins as buys", async ()
   }
 });
 
-Deno.test("RankTrendPortfolio flags declining held coins as sells", async () => {
-  const strategy = new RankTrendPortfolio(config);
+Deno.test("RankTrendPortfolio flags declining held coins as sells", () => {
+  const strategy = RankTrendPortfolio(5);
 
   const activePositions: PositionState[] = [
     { symbol: "BTC-USDT", entryPrice: 100, size: 0.1, enteredAt: 0, entryValue: 10 },
     { symbol: "SOL-USDT", entryPrice: 50, size: 0.2, enteredAt: 0, entryValue: 10 },
   ];
 
-  await strategy.analyze({
-    candidates: [
-      { symbol: "BTC-USDT", score: 1000, reason: "vol" },
-      { symbol: "ETH-USDT", score: 800, reason: "vol" },
-      { symbol: "SOL-USDT", score: 600, reason: "vol" },
-    ],
-    activePositions,
-    prices: new Map(),
-    client: undefined as any,
-    interval: "1hour",
-    candleRangeMs: 0,
-  });
+  strategy(activePositions, [
+    { symbol: "BTC-USDT", score: 1000, reason: "vol" },
+    { symbol: "ETH-USDT", score: 800, reason: "vol" },
+    { symbol: "SOL-USDT", score: 600, reason: "vol" },
+  ]);
 
-  const decision = await strategy.analyze({
-    candidates: [
-      { symbol: "ETH-USDT", score: 1000, reason: "vol" },
-      { symbol: "SOL-USDT", score: 800, reason: "vol" },
-      { symbol: "BTC-USDT", score: 400, reason: "vol" },
-    ],
-    activePositions,
-    prices: new Map(),
-    client: undefined as any,
-    interval: "1hour",
-    candleRangeMs: 0,
-  });
+  const decision = strategy(activePositions, [
+    { symbol: "ETH-USDT", score: 1000, reason: "vol" },
+    { symbol: "SOL-USDT", score: 800, reason: "vol" },
+    { symbol: "BTC-USDT", score: 400, reason: "vol" },
+  ]);
 
   const sellSymbols = decision.wantToSell.map((s) => s.symbol);
   if (!sellSymbols.includes("BTC-USDT")) {
@@ -102,36 +73,22 @@ Deno.test("RankTrendPortfolio flags declining held coins as sells", async () => 
   }
 });
 
-Deno.test("RankTrendPortfolio does not buy already-held coins", async () => {
-  const strategy = new RankTrendPortfolio(config);
+Deno.test("RankTrendPortfolio does not buy already-held coins", () => {
+  const strategy = RankTrendPortfolio(5);
 
   const activePositions: PositionState[] = [
     { symbol: "ETH-USDT", entryPrice: 100, size: 1, enteredAt: 0, entryValue: 100 },
   ];
 
-  await strategy.analyze({
-    candidates: [
-      { symbol: "BTC-USDT", score: 800, reason: "vol" },
-      { symbol: "ETH-USDT", score: 600, reason: "vol" },
-    ],
-    activePositions,
-    prices: new Map(),
-    client: undefined as any,
-    interval: "1hour",
-    candleRangeMs: 0,
-  });
+  strategy(activePositions, [
+    { symbol: "BTC-USDT", score: 800, reason: "vol" },
+    { symbol: "ETH-USDT", score: 600, reason: "vol" },
+  ]);
 
-  const decision = await strategy.analyze({
-    candidates: [
-      { symbol: "ETH-USDT", score: 1000, reason: "vol" },
-      { symbol: "BTC-USDT", score: 500, reason: "vol" },
-    ],
-    activePositions,
-    prices: new Map(),
-    client: undefined as any,
-    interval: "1hour",
-    candleRangeMs: 0,
-  });
+  const decision = strategy(activePositions, [
+    { symbol: "ETH-USDT", score: 1000, reason: "vol" },
+    { symbol: "BTC-USDT", score: 500, reason: "vol" },
+  ]);
 
   if (decision.wantToBuy.some((b) => b.symbol === "ETH-USDT")) {
     throw new Error("Should not buy already-held ETH-USDT");

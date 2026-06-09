@@ -1,9 +1,8 @@
 import { pipelineSimulate } from "./engine/simulate.ts";
 import { FileDiscovery } from "./discovery/testdata.ts";
-import { config as fileDiscCfg } from "./discovery/testdata.config.ts";
 import { RankTrendPortfolio } from "./portfolio/rank-trend.ts";
-import { config as rankTrendCfg } from "./portfolio/rank-trend.config.ts";
-import { RsiTimedTrading, rsiTimedCfg, MacdTimedTrading, macdTimedCfg, BbTimedTrading, bbTimedCfg, EmaAdxTimedTrading, emaAdxTimedCfg } from "./trading/mod.ts";
+import { RsiTimed, MacdTimed, BollingerTimed, EmaAdxTimed } from "./trading/mod.ts";
+import { LineJournal } from "./communication/line-journal.ts";
 import type { Kline } from "./kucoin/mod.ts";
 
 function parseArgs() {
@@ -17,7 +16,7 @@ function parseArgs() {
 function createPortfolioStrategy(name: string) {
   switch (name) {
     case "rank-trend":
-      return new RankTrendPortfolio(rankTrendCfg);
+      return RankTrendPortfolio(5);
     default:
       throw new Error(`Unknown portfolio strategy: ${name}`);
   }
@@ -26,13 +25,13 @@ function createPortfolioStrategy(name: string) {
 function createTradingStrategy(name: string) {
   switch (name) {
     case "rsi-timed":
-      return new RsiTimedTrading(rsiTimedCfg);
+      return RsiTimed();
     case "macd-timed":
-      return new MacdTimedTrading(macdTimedCfg);
+      return MacdTimed();
     case "bb-timed":
-      return new BbTimedTrading(bbTimedCfg);
+      return BollingerTimed();
     case "ema-adx-timed":
-      return new EmaAdxTimedTrading(emaAdxTimedCfg);
+      return EmaAdxTimed();
     default:
       throw new Error(`Unknown trading strategy: ${name}`);
   }
@@ -66,9 +65,10 @@ console.log(`Trading:   ${args.trading}\n`);
 
 const data = await loadData();
 
-const discoveryStrategy = new FileDiscovery(fileDiscCfg);
+const discoveryStrategy = FileDiscovery({ topN: 20 });
 const portfolioStrategy = createPortfolioStrategy(args.portfolio);
 const tradingStrategy = createTradingStrategy(args.trading);
+const logger = LineJournal();
 
 const result = await pipelineSimulate({
   discoveryStrategy,
@@ -82,6 +82,7 @@ const result = await pipelineSimulate({
     targetPositions: 5,
     fee: 0.001,
   },
+  logger,
 });
 
 console.log(`=== Results ===`);

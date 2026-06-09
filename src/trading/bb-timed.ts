@@ -3,44 +3,38 @@ import type { PositionState, SwapPlan } from "../engine/mod.ts";
 import type { Kline } from "../kucoin/mod.ts";
 import { rsi, bollingerBands, avgVolume } from "../indicators.ts";
 
-export class BbTimedTrading implements TradingStrategy {
-  readonly name = "bb-timed";
-  readonly config: Record<string, number>;
+export function BollingerTimed(config?: { rsiPeriod?: number; rsiOversold?: number; rsiOverbought?: number; bbPeriod?: number; bbStdDev?: number; volumeMin?: number; minConfidence?: number }): TradingStrategy {
+  const rsiPeriod = config?.rsiPeriod ?? 14;
+  const rsiOversold = config?.rsiOversold ?? 30;
+  const rsiOverbought = config?.rsiOverbought ?? 70;
+  const bbPeriod = config?.bbPeriod ?? 20;
+  const bbStdDev = config?.bbStdDev ?? 2;
+  const volumeMin = config?.volumeMin ?? 0.8;
+  const minConfidence = config?.minConfidence ?? 50;
 
-  constructor(config: Record<string, number>) {
-    this.config = config;
-  }
-
-  async plan(params: {
+  const strategy = (params: {
     wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
     wantToSell: Array<{ symbol: string; reason: string }>;
     activePositions: PositionState[];
     prices: Map<string, number>;
     klines: Map<string, Kline[]>;
     targetPositions: number;
-  }): Promise<SwapPlan> {
+  }): SwapPlan => {
     const swaps: Array<{ sellSymbol: string; buySymbol: string; reason: string }> = [];
-    const rsiP = this.config.rsiPeriod ?? 14;
-    const rsiOS = this.config.rsiOversold ?? 30;
-    const rsiOB = this.config.rsiOverbought ?? 70;
-    const bbP = this.config.bbPeriod ?? 20;
-    const bbSD = this.config.bbStdDev ?? 2;
-    const volMin = this.config.volumeMin ?? 0.8;
-    const minConf = this.config.minConfidence ?? 50;
 
     for (const sell of params.wantToSell) {
       const k = params.klines.get(sell.symbol);
-      if (!k || k.length < Math.max(rsiP, bbP) + 10) continue;
+      if (!k || k.length < Math.max(rsiPeriod, bbPeriod) + 10) continue;
       const closes = k.map((c) => c.close);
       const volumes = k.map((c) => c.volume);
-      const rsiVals = rsi(closes, rsiP);
+      const rsiVals = rsi(closes, rsiPeriod);
       const latestRSI = rsiVals[rsiVals.length - 1];
-      const bb = bollingerBands(closes, bbP, bbSD);
+      const bb = bollingerBands(closes, bbPeriod, bbStdDev);
       const bbIdx = closes.length - 1 - bb.offset;
       const latestClose = closes[closes.length - 1];
       const volRatio = volumes[volumes.length - 1] / avgVolume(volumes, 20);
 
-      if (latestRSI > rsiOB && latestClose > bb.upper[bbIdx] && volRatio > volMin) {
+      if (latestRSI > rsiOverbought && latestClose > bb.upper[bbIdx] && volRatio > volumeMin) {
         swaps.push({
           sellSymbol: sell.symbol,
           buySymbol: "",
@@ -48,7 +42,7 @@ export class BbTimedTrading implements TradingStrategy {
         });
       } else if (rsiVals.length > 1) {
         const prevRSI = rsiVals[rsiVals.length - 2];
-        if (prevRSI > rsiOB && latestRSI <= rsiOB) {
+        if (prevRSI > rsiOverbought && latestRSI <= rsiOverbought) {
           swaps.push({
             sellSymbol: sell.symbol,
             buySymbol: "",
@@ -65,20 +59,20 @@ export class BbTimedTrading implements TradingStrategy {
     for (const buy of params.wantToBuy) {
       if (buysAdded >= slotsLeft) break;
       if (held.has(buy.symbol)) continue;
-      if (buy.confidence < minConf) continue;
+      if (buy.confidence < minConfidence) continue;
 
       const k = params.klines.get(buy.symbol);
-      if (!k || k.length < Math.max(rsiP, bbP) + 10) continue;
+      if (!k || k.length < Math.max(rsiPeriod, bbPeriod) + 10) continue;
       const closes = k.map((c) => c.close);
       const volumes = k.map((c) => c.volume);
-      const rsiVals = rsi(closes, rsiP);
+      const rsiVals = rsi(closes, rsiPeriod);
       const latestRSI = rsiVals[rsiVals.length - 1];
-      const bb = bollingerBands(closes, bbP, bbSD);
+      const bb = bollingerBands(closes, bbPeriod, bbStdDev);
       const bbIdx = closes.length - 1 - bb.offset;
       const latestClose = closes[closes.length - 1];
       const volRatio = volumes[volumes.length - 1] / avgVolume(volumes, 20);
 
-      if (latestRSI < rsiOS && latestClose < bb.lower[bbIdx] && volRatio > volMin) {
+      if (latestRSI < rsiOversold && latestClose < bb.lower[bbIdx] && volRatio > volumeMin) {
         swaps.push({
           sellSymbol: "",
           buySymbol: buy.symbol,
@@ -89,5 +83,8 @@ export class BbTimedTrading implements TradingStrategy {
     }
 
     return { swaps };
-  }
+  };
+
+  Object.defineProperty(strategy, "name", { value: "bb-timed" });
+  return strategy;
 }

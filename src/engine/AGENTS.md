@@ -8,7 +8,7 @@ Shared engine types and pipeline execution.
 |------|---------|
 | `types.ts` | `PositionState`, `PortfolioDecision`, `Swap`, `SwapPlan`, `PipelineResult`, `TradeRecord`, `ExecutionResult`, `SimData` |
 | `simulate.ts` | `pipelineSimulate()` — bar-by-bar backtest |
-| `live.ts` | `TradingEngine` — live loop with discovery/portfolio/trading/execution/reflection/communication |
+| `live.ts` | `TradingEngine` — live loop with discovery/portfolio/trading/execution/reflection/logger |
 | `mod.ts` | Re-exports all engine types for cross-module consumers |
 
 ## Interfaces

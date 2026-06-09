@@ -6,16 +6,8 @@ Assess which coins are wanted/unwanted and determine position sizing.
 
 ```ts
 interface PortfolioStrategy {
+  (activePositions: PositionState[], candidates: CoinCandidate[]): PortfolioDecision;
   readonly name: string;
-  readonly config: PortfolioConfig;
-  analyze(params: {
-    candidates: CoinCandidate[];
-    activePositions: PositionState[];
-    prices: Map<string, number>;
-    client: KucoinClient;
-    interval: string;
-    candleRangeMs: number;
-  }): Promise<PortfolioDecision>;
 }
 ```
 
@@ -24,15 +16,6 @@ interface PortfolioStrategy {
 | Name | File | Description |
 |------|------|-------------|
 | `rank-trend` | `rank-trend.ts` | Buy improving-rank coins, sell declining-rank held coins |
-
-## Config
-
-```ts
-interface PortfolioConfig {
-  targetPositions: number;
-  allocationMethod: "equal" | "weighted";
-}
-```
 
 ## Output
 

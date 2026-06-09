@@ -1,13 +1,13 @@
 import type { PortfolioStrategy } from "../portfolio/mod.ts";
 import type { TradingStrategy } from "../trading/mod.ts";
 import type { ExecutionStrategy } from "../execution/mod.ts";
-import type { CommunicationStrategy } from "../communication/mod.ts";
+import type { Logger } from "../communication/mod.ts";
 import type { ReflectionStrategy } from "../reflection/mod.ts";
 import type { DiscoveryStrategy } from "../discovery/mod.ts";
 import type { PositionLoader } from "../position/mod.ts";
 import { KucoinClient } from "../kucoin/mod.ts";
 import type { Kline } from "../kucoin/mod.ts";
-import type { PositionState, PortfolioDecision, PipelineResult, TradeRecord } from "./types.ts";
+import type { PositionState, PipelineResult, TradeRecord } from "./types.ts";
 
 export interface LiveEngineConfig {
   client: KucoinClient;
@@ -15,7 +15,7 @@ export interface LiveEngineConfig {
   portfolio: PortfolioStrategy;
   trading: TradingStrategy;
   execution: ExecutionStrategy;
-  communication: CommunicationStrategy;
+  logger: Logger;
   reflection: ReflectionStrategy;
   positionLoader: PositionLoader;
   intervalMs: number;
@@ -37,16 +37,15 @@ export class TradingEngine {
 
   async start(): Promise<void> {
     this.running = true;
-    const comm = this.config.communication;
+    const { logger, discovery, portfolio, trading, execution, reflection, client, targetPositions, candleInterval, candleRangeMs, reserveSymbol } = this.config;
 
-    console.log(`=== Live Trading Engine ===`);
-    console.log(`Discovery:    ${this.config.discovery.name}`);
-    console.log(`Portfolio:    ${this.config.portfolio.name}`);
-    console.log(`Trading:      ${this.config.trading.name}`);
-    console.log(`Execution:    ${this.config.execution.name}`);
-    console.log(`Communication: ${this.config.communication.name}`);
-    console.log(`Reflection:   ${this.config.reflection.name}`);
-    console.log(`Interval:     ${this.config.intervalMs / 60000} min\n`);
+    logger({ action: "startup", message: "=== Live Trading Engine ===" });
+    logger({ action: "startup", message: `Discovery:    ${discovery.name}` });
+    logger({ action: "startup", message: `Portfolio:    ${portfolio.name}` });
+    logger({ action: "startup", message: `Trading:      ${trading.name}` });
+    logger({ action: "startup", message: `Execution:    ${execution.name}` });
+    logger({ action: "startup", message: `Reflection:   ${reflection.name}` });
+    logger({ action: "startup", message: `Interval:     ${this.config.intervalMs / 60000} min` });
 
     await this.loadInitialPositions();
 
@@ -57,16 +56,19 @@ export class TradingEngine {
       try {
         await this.cycle();
       } catch (err) {
-        comm.error(err instanceof Error ? err : new Error(String(err)));
+        logger({
+          action: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
       const elapsed = Date.now() - start;
       const wait = Math.max(60000, this.config.intervalMs - elapsed);
-      console.log(`\nWaiting ${(wait / 60000).toFixed(0)} min...\n`);
+      logger({ action: "wait", message: `Waiting ${(wait / 60000).toFixed(0)} min...` });
       while (this.running && Date.now() - start < this.config.intervalMs) {
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
-    console.log("Engine stopped.");
+    logger({ action: "shutdown", message: "Engine stopped." });
   }
 
   stop(): void {
@@ -82,40 +84,50 @@ export class TradingEngine {
 
   private async loadInitialPositions(): Promise<void> {
     const loader = this.config.positionLoader;
+    const logger = this.config.logger;
 
-    console.log("=== Initializing portfolio ===");
-    this.initialPositions = await loader.loadPositions();
+    logger({ action: "init", message: "=== Initializing portfolio ===" });
+    this.initialPositions = await loader();
 
     if (this.initialPositions.length === 0) {
-      console.log("No existing positions found.\n");
+      logger({ action: "init", message: "No existing positions found." });
       return;
     }
 
     for (const p of this.initialPositions) {
       const currency = p.symbol.replace("-USDT", "");
-      console.log(
-        `  ${currency.padEnd(10)} ${p.size.toFixed(4).padStart(12)} @ $${p.entryPrice.toFixed(4).padStart(10)} = $${p.entryValue.toFixed(2)}`,
-      );
+      logger({
+        action: "init",
+        symbol: p.symbol,
+        message: `${currency.padEnd(10)} ${p.size.toFixed(4).padStart(12)} @ $${p.entryPrice.toFixed(4).padStart(10)} = $${p.entryValue.toFixed(2)}`,
+      });
     }
 
-    console.log(`\nTotal ${this.initialPositions.length} positions, ` +
-      `$ ${this.initialPositions.reduce((s, p) => s + p.entryValue, 0).toFixed(2)}\n`);
+    logger({
+      action: "init",
+      message: `Total ${this.initialPositions.length} positions, $ ${this.initialPositions.reduce((s, p) => s + p.entryValue, 0).toFixed(2)}`,
+    });
   }
 
   private async cycle(): Promise<void> {
     this.cycleCount++;
-    const { client, discovery, portfolio, trading, execution, communication, reflection, targetPositions, candleInterval, candleRangeMs, reserveSymbol } = this.config;
+    const { client, discovery, portfolio, trading, execution, logger, reflection, targetPositions, candleInterval, candleRangeMs, reserveSymbol } = this.config;
 
-    console.log(`\n=== Cycle ${this.cycleCount} ===`);
+    logger({ cycle: this.cycleCount, action: "cycle", message: `=== Cycle ${this.cycleCount} ===` });
 
     // 1. Discovery — find top coins
-    const candidates = await discovery.discover();
+    const candidates = await discovery();
     if (candidates.length === 0) {
-      console.log("No coins found.");
+      logger({ cycle: this.cycleCount, action: "discovery", message: "No coins found." });
       return;
     }
     const symbols = candidates.map((c) => c.symbol);
-    console.log(`Found ${symbols.length} coins: ${symbols.slice(0, 5).join(", ")}...`);
+    logger({
+      cycle: this.cycleCount,
+      role: "DI",
+      action: "discovery",
+      message: `Found ${symbols.length} coins: ${symbols.slice(0, 5).join(", ")}...`,
+    });
 
     // 2. Fetch klines and prices
     const now = Date.now();
@@ -157,45 +169,78 @@ export class TradingEngine {
       }
     }
 
-    console.log(`\n  ── Portfolio ──`);
+    logger({ cycle: this.cycleCount, role: "PO", action: "portfolio", message: "── Portfolio ──" });
     if (activePositions.length === 0) {
-      console.log(`     (no positions)`);
+      logger({ cycle: this.cycleCount, role: "PO", action: "portfolio", message: "(no positions)" });
     } else {
       let totalValue = 0;
       for (const p of activePositions) {
         const price = prices.get(p.symbol) ?? 0;
         const value = p.size * price;
         totalValue += value;
-        console.log(`     ${p.symbol.padEnd(12)} ${p.size.toFixed(4).padStart(10)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`);
+        logger({
+          cycle: this.cycleCount,
+          role: "PO",
+          action: "portfolio",
+          symbol: p.symbol,
+          message: `${p.symbol.padEnd(12)} ${p.size.toFixed(4).padStart(10)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`,
+        });
       }
-      console.log(`     ─────────────────────────────────────────────`);
-      console.log(`     Total: $${totalValue.toFixed(2)}`);
+      logger({
+        cycle: this.cycleCount,
+        role: "PO",
+        action: "portfolio",
+        message: `Total: $${totalValue.toFixed(2)}`,
+      });
     }
 
     // 4. Portfolio analysis
-    const decision = await portfolio.analyze({
-      candidates,
-      activePositions,
-      prices,
-      client,
-      interval: candleInterval,
-      candleRangeMs,
-    });
+    const decision = portfolio(activePositions, candidates);
 
-    console.log(`\n  ── Portfolio decision ──`);
-    console.log(`     Want to buy (${decision.wantToBuy.length}):`);
+    logger({ cycle: this.cycleCount, role: "PO", action: "decision", message: "── Portfolio decision ──" });
+    logger({
+      cycle: this.cycleCount,
+      role: "PO",
+      action: "decision",
+      message: `Want to buy (${decision.wantToBuy.length}):`,
+    });
     for (const b of decision.wantToBuy) {
-      console.log(`       + ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`);
+      logger({
+        cycle: this.cycleCount,
+        role: "PO",
+        action: "decision",
+        side: "buy",
+        symbol: b.symbol,
+        reason: b.reason,
+        message: `+ ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`,
+      });
     }
-    if (decision.wantToBuy.length === 0) console.log(`       (none)`);
-    console.log(`     Want to sell (${decision.wantToSell.length}):`);
+    if (decision.wantToBuy.length === 0) {
+      logger({ cycle: this.cycleCount, role: "PO", action: "decision", message: "  (none)" });
+    }
+    logger({
+      cycle: this.cycleCount,
+      role: "PO",
+      action: "decision",
+      message: `Want to sell (${decision.wantToSell.length}):`,
+    });
     for (const s of decision.wantToSell) {
-      console.log(`       - ${s.symbol.padEnd(12)} ${s.reason}`);
+      logger({
+        cycle: this.cycleCount,
+        role: "PO",
+        action: "decision",
+        side: "sell",
+        symbol: s.symbol,
+        reason: s.reason,
+        message: `- ${s.symbol.padEnd(12)} ${s.reason}`,
+      });
     }
-    if (decision.wantToSell.length === 0) console.log(`       (none)`);
+    if (decision.wantToSell.length === 0) {
+      logger({ cycle: this.cycleCount, role: "PO", action: "decision", message: "  (none)" });
+    }
 
     // 5. Trading plan
-    const plan = await trading.plan({
+    const plan = trading({
       wantToBuy: decision.wantToBuy,
       wantToSell: decision.wantToSell,
       activePositions,
@@ -204,9 +249,22 @@ export class TradingEngine {
       targetPositions,
     });
 
-    console.log(`\n  ── Execution ──`);
+    for (const swap of plan.swaps) {
+      const parts: string[] = [];
+      if (swap.sellSymbol) parts.push(`Sell ${swap.sellSymbol}`);
+      if (swap.buySymbol) parts.push(`Buy ${swap.buySymbol}`);
+      logger({
+        cycle: this.cycleCount,
+        role: "TR",
+        action: "signal",
+        reason: swap.reason,
+        message: parts.join(" → "),
+      });
+    }
+
+    logger({ cycle: this.cycleCount, role: "EX", action: "execution", message: "── Execution ──" });
     if (plan.swaps.length === 0) {
-      console.log(`     (no swaps this cycle)`);
+      logger({ cycle: this.cycleCount, role: "EX", action: "execution", message: "(no swaps this cycle)" });
     }
     for (const swap of plan.swaps) {
       if (swap.sellSymbol) {
@@ -215,15 +273,29 @@ export class TradingEngine {
         const size = pos?.size ?? 0;
         const gross = size * price;
         const net = gross * (1 - 0.001);
-        console.log(`     Sell ${swap.sellSymbol.padEnd(12)} ${size.toFixed(4)} coins @ $${price.toFixed(4)} = $${gross.toFixed(2)} → $${net.toFixed(2)} received`);
-        console.log(`       Reason: ${swap.reason}`);
+        logger({
+          cycle: this.cycleCount,
+          role: "EX",
+          action: "sell",
+          side: "sell",
+          symbol: swap.sellSymbol,
+          reason: swap.reason,
+          message: `Sell ${swap.sellSymbol.padEnd(12)} ${size.toFixed(4)} coins @ $${price.toFixed(4)} = $${gross.toFixed(2)} → $${net.toFixed(2)} received`,
+        });
       }
       if (swap.buySymbol) {
         const price = prices.get(swap.buySymbol) ?? 0;
         const slotsLeft = targetPositions - activePositions.length;
         const spendEstimate = plan.swaps.length > 1 ? 100 : 50;
-        console.log(`     Buy  ${swap.buySymbol.padEnd(12)} ~$${spendEstimate.toFixed(2)} @ $${price.toFixed(4)} = ~${(spendEstimate / price).toFixed(4)} coins`);
-        console.log(`       Reason: ${swap.reason}`);
+        logger({
+          cycle: this.cycleCount,
+          role: "EX",
+          action: "buy",
+          side: "buy",
+          symbol: swap.buySymbol,
+          reason: swap.reason,
+          message: `Buy  ${swap.buySymbol.padEnd(12)} ~$${spendEstimate.toFixed(2)} @ $${price.toFixed(4)} = ~${(spendEstimate / price).toFixed(4)} coins`,
+        });
       }
     }
 
@@ -235,7 +307,7 @@ export class TradingEngine {
     });
 
     // 7. Execute swaps
-    const execResult = await execution.executeSwaps(plan.swaps, new Map(), 0);
+    const execResult = await execution(plan.swaps, new Map(), 0);
 
     // 8. Record outcomes
     reflection.recordOutcome({
@@ -246,22 +318,21 @@ export class TradingEngine {
     // 9. Reflect
     const insights = reflection.reflect();
     for (const insight of insights) {
-      console.log(`  [${insight.type}] ${insight.message}`);
+      logger({
+        cycle: this.cycleCount,
+        role: "AN",
+        action: "insight",
+        message: `[${insight.type}] ${insight.message}`,
+      });
     }
 
-    // 10. Build pipeline result for reporting
-    const pipeResult: PipelineResult = {
-      equityCurve: [],
-      trades: execResult.trades,
-      totalReturn: 0,
-      maxDrawdown: 0,
-      sharpeRatio: 0,
-      winRate: 0,
-      profitFactor: 0,
-      totalTrades: execResult.trades.length,
-    };
-
-    // 11. Report
-    communication.report(pipeResult);
+    // 10. Report via logger
+    if (execResult.trades.length > 0) {
+      logger({
+        cycle: this.cycleCount,
+        action: "report",
+        message: `Trades this cycle: ${execResult.trades.length}`,
+      });
+    }
   }
 }

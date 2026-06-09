@@ -3,38 +3,32 @@ import type { PositionState, SwapPlan } from "../engine/mod.ts";
 import type { Kline } from "../kucoin/mod.ts";
 import { macd, avgVolume } from "../indicators.ts";
 
-export class MacdTimedTrading implements TradingStrategy {
-  readonly name = "macd-timed";
-  readonly config: Record<string, number>;
+export function MacdTimed(config?: { fastPeriod?: number; slowPeriod?: number; signalPeriod?: number; volumeThreshold?: number; minConfidence?: number }): TradingStrategy {
+  const fastPeriod = config?.fastPeriod ?? 12;
+  const slowPeriod = config?.slowPeriod ?? 26;
+  const signalPeriod = config?.signalPeriod ?? 9;
+  const volumeThreshold = config?.volumeThreshold ?? 1.2;
+  const minConfidence = config?.minConfidence ?? 50;
 
-  constructor(config: Record<string, number>) {
-    this.config = config;
-  }
-
-  async plan(params: {
+  const strategy = (params: {
     wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
     wantToSell: Array<{ symbol: string; reason: string }>;
     activePositions: PositionState[];
     prices: Map<string, number>;
     klines: Map<string, Kline[]>;
     targetPositions: number;
-  }): Promise<SwapPlan> {
+  }): SwapPlan => {
     const swaps: Array<{ sellSymbol: string; buySymbol: string; reason: string }> = [];
-    const fp = this.config.fastPeriod ?? 12;
-    const sp = this.config.slowPeriod ?? 26;
-    const sigP = this.config.signalPeriod ?? 9;
-    const volThresh = this.config.volumeThreshold ?? 1.2;
-    const minConf = this.config.minConfidence ?? 50;
 
     for (const sell of params.wantToSell) {
       const k = params.klines.get(sell.symbol);
-      if (!k || k.length < sp + sigP) continue;
+      if (!k || k.length < slowPeriod + signalPeriod) continue;
       const closes = k.map((c) => c.close);
       const volumes = k.map((c) => c.volume);
-      const { histogram } = macd(closes, fp, sp, sigP);
+      const { histogram } = macd(closes, fastPeriod, slowPeriod, signalPeriod);
       const latestHist = histogram[histogram.length - 1];
       const prevHist = histogram[histogram.length - 2];
-      const volRatio = volumes[volumes.length - 1] / avgVolume(volumes, sp);
+      const volRatio = volumes[volumes.length - 1] / avgVolume(volumes, slowPeriod);
 
       if (prevHist >= 0 && latestHist < 0) {
         swaps.push({
@@ -52,21 +46,18 @@ export class MacdTimedTrading implements TradingStrategy {
     for (const buy of params.wantToBuy) {
       if (buysAdded >= slotsLeft) break;
       if (held.has(buy.symbol)) continue;
-      if (buy.confidence < minConf) continue;
+      if (buy.confidence < minConfidence) continue;
 
       const k = params.klines.get(buy.symbol);
-      if (!k || k.length < sp + sigP) continue;
+      if (!k || k.length < slowPeriod + signalPeriod) continue;
       const closes = k.map((c) => c.close);
       const volumes = k.map((c) => c.volume);
-
-      const { macdLine, signalLine, histogram } = macd(closes, fp, sp, sigP);
-      const latestMACD = macdLine[macdLine.length - 1];
-      const latestSignal = signalLine[signalLine.length - 1];
-      const prevHist = histogram[histogram.length - 2];
+      const { histogram } = macd(closes, fastPeriod, slowPeriod, signalPeriod);
       const latestHist = histogram[histogram.length - 1];
-      const volRatio = volumes[volumes.length - 1] / avgVolume(volumes, sp);
+      const prevHist = histogram[histogram.length - 2];
+      const volRatio = volumes[volumes.length - 1] / avgVolume(volumes, slowPeriod);
 
-      if (prevHist <= 0 && latestHist > 0 && volRatio > volThresh && latestMACD > latestSignal) {
+      if (prevHist <= 0 && latestHist > 0) {
         swaps.push({
           sellSymbol: "",
           buySymbol: buy.symbol,
@@ -77,5 +68,8 @@ export class MacdTimedTrading implements TradingStrategy {
     }
 
     return { swaps };
-  }
+  };
+
+  Object.defineProperty(strategy, "name", { value: "macd-timed" });
+  return strategy;
 }

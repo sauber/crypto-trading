@@ -6,9 +6,8 @@ Load current portfolio state from various sources.
 
 ```ts
 interface PositionLoader {
+  (): Promise<PositionState[]>;
   readonly name: string;
-  readonly config: PositionConfig;
-  loadPositions(): Promise<PositionState[]>;
 }
 ```
 
@@ -18,13 +17,3 @@ interface PositionLoader {
 |------|------|-------------|
 | `blank` | `blank.ts` | Returns empty portfolio (initial start) |
 | `kucoin` | `kucoin.ts` | Reads current balances from KuCoin API |
-
-## Config
-
-```ts
-interface PositionConfig {
-  reserveSymbol: string;
-  candleInterval: string;
-  candleRangeMs: number;
-}
-```

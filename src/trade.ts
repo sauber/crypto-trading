@@ -12,9 +12,9 @@ import {
   portfolioRegistry,
   tradingRegistry,
   executionRegistry,
-  commRegistry,
   reflectionRegistry,
 } from "./registry/registration.ts";
+import { LineJournal } from "./communication/line-journal.ts";
 
 const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";
 const KUCOIN_API_SECRET = Deno.env.get("KUCOIN_API_SECRET") || "";
@@ -49,21 +49,19 @@ const execution = executionRegistry
   .get(DRY_RUN ? "simulate" : "kucoin")
   .create({ fee }, client, true);
 
-const comm = commRegistry
-  .get(ROLE_CONFIG.communication.strategy)
-  .create();
+const logger = LineJournal();
 
 const reflection = reflectionRegistry
   .get(ROLE_CONFIG.reflection.strategy)
   .create();
 
 const positionLoader = DRY_RUN
-  ? new BlankPositionLoader({
+  ? BlankPositionLoader({
     reserveSymbol: ROLE_CONFIG.reserveSymbol,
     candleInterval: ROLE_CONFIG.candleInterval,
     candleRangeMs: ROLE_CONFIG.candleRangeMs,
   })
-  : new KucoinPositionLoader(
+  : KucoinPositionLoader(
     {
       reserveSymbol: ROLE_CONFIG.reserveSymbol,
       candleInterval: ROLE_CONFIG.candleInterval,
@@ -78,7 +76,7 @@ const engineConfig: LiveEngineConfig = {
   portfolio,
   trading,
   execution,
-  communication: comm,
+  logger,
   reflection,
   positionLoader,
   intervalMs: ROLE_CONFIG.cycleIntervalMs,
@@ -93,7 +91,6 @@ console.log(`discovery=${ROLE_CONFIG.discovery.strategy}`);
 console.log(`portfolio=${ROLE_CONFIG.portfolio.strategy}`);
 console.log(`trading=${ROLE_CONFIG.trading.strategy}`);
 console.log(`execution=${DRY_RUN ? "simulate" : "kucoin"}`);
-console.log(`communication=${ROLE_CONFIG.communication.strategy}`);
 console.log(`reflection=${ROLE_CONFIG.reflection.strategy}`);
 
 const engine = new TradingEngine(engineConfig);

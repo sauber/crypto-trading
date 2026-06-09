@@ -1,28 +1,21 @@
-import type { DiscoveryStrategy, DiscoveryConfig, DiscoveryParams, CoinCandidate } from "./types.ts";
+import type { DiscoveryStrategy, DiscoveryParams, CoinCandidate } from "./types.ts";
 import type { KucoinClient } from "../kucoin/mod.ts";
 
 const CANDIDATE_POOL = 50;
 const FETCH_INTERVAL = "1hour";
 const FETCH_RANGE_MS = 86400000;
 
-export class KucoinDiscovery implements DiscoveryStrategy {
-  readonly name = "kucoin";
-  readonly config: DiscoveryConfig;
-  private client: KucoinClient;
+export function KucoinDiscovery(config: { topN: number }, client: KucoinClient): DiscoveryStrategy {
+  const { topN } = config;
 
-  constructor(config: DiscoveryConfig, client: KucoinClient) {
-    this.config = config;
-    this.client = client;
-  }
-
-  async discover(_params?: DiscoveryParams): Promise<CoinCandidate[]> {
-    const pool = await this.client.getTopVolumeSymbols(CANDIDATE_POOL);
+  const strategy = async (_params?: DiscoveryParams): Promise<CoinCandidate[]> => {
+    const pool = await client.getTopVolumeSymbols(CANDIDATE_POOL);
     const now = Date.now();
     const candidates: CoinCandidate[] = [];
 
     for (const s of pool) {
       try {
-        const klines = await this.client.getKlines(s.symbol, FETCH_INTERVAL, now - FETCH_RANGE_MS, now);
+        const klines = await client.getKlines(s.symbol, FETCH_INTERVAL, now - FETCH_RANGE_MS, now);
         if (klines.length === 0) continue;
         const last = klines[klines.length - 1];
         const liquidity = last.volume * last.close;
@@ -37,6 +30,9 @@ export class KucoinDiscovery implements DiscoveryStrategy {
     }
 
     candidates.sort((a, b) => b.score - a.score);
-    return candidates.slice(0, this.config.topN);
-  }
+    return candidates.slice(0, topN);
+  };
+
+  Object.defineProperty(strategy, "name", { value: "kucoin" });
+  return strategy;
 }

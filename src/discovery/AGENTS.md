@@ -6,9 +6,8 @@ Find top USDT-pairs by 24h volume.
 
 ```ts
 interface DiscoveryStrategy {
+  (params?: DiscoveryParams): Promise<CoinCandidate[]>;
   readonly name: string;
-  readonly config: DiscoveryConfig;
-  discover(params?: DiscoveryParams): Promise<CoinCandidate[]>;
 }
 ```
 
@@ -18,12 +17,6 @@ interface DiscoveryStrategy {
 |------|------|-------------|
 | `testdata` | `testdata.ts` | Reads from pre-loaded klines map (backtest/optimize) |
 | `kucoin` | `kucoin.ts` | Fetches via KuCoin REST API (live) |
-
-## Config
-
-```ts
-interface DiscoveryConfig { topN: number }
-```
 
 ## Types
 

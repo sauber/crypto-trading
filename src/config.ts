@@ -1,9 +1,8 @@
 export const ROLE_CONFIG = {
   discovery: { strategy: "kucoin", params: { topN: 20 } },
-  portfolio: { strategy: "rank-trend", params: { targetPositions: 5, allocationMethod: "equal" } },
+  portfolio: { strategy: "rank-trend", params: { targetPositions: 5 } },
   trading: { strategy: "rsi-timed", params: { rsiPeriod: 14, rsiOversold: 30, rsiOverbought: 70, minConfidence: 50 } },
   execution: { strategy: "simulate", params: { fee: 0.001 } },
-  communication: { strategy: "silent" },
   reflection: { strategy: "noop" },
   targetPositions: 5,
   reserveSymbol: "USDC",

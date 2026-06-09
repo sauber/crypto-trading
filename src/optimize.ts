@@ -2,8 +2,6 @@ import type { Kline } from "./kucoin/mod.ts";
 import { pipelineSimulate } from "./engine/simulate.ts";
 import type { SimConfig } from "./engine/simulate.ts";
 import { FileDiscovery } from "./discovery/testdata.ts";
-import { config as fileDiscCfg } from "./discovery/testdata.config.ts";
-import { ROLE_CONFIG } from "./config.ts";
 import {
   portfolioRegistry,
   tradingRegistry,
@@ -187,7 +185,7 @@ async function evaluate(
     .get(tradingName)
     .create(tradingCfg);
 
-  const discoveryStrategy = new FileDiscovery(fileDiscCfg);
+  const discoveryStrategy = FileDiscovery({ topN: 20 });
   const coinsArr = [...klines.keys()];
   const sc: SimConfig = {
     initialCapital: 10000,
@@ -216,7 +214,9 @@ const coins: string[] = data.coins;
 const rawKlines: Record<string, unknown[]> = data.klines;
 const klineMap = new Map<string, Kline[]>();
 for (const coin of coins) {
-  klineMap.set(coin, (rawKlines[coin] || []) as Kline[]);
+  const bars = (rawKlines[coin] || []) as Kline[];
+  bars.sort((a, b) => a.timestamp - b.timestamp);
+  klineMap.set(coin, bars);
 }
 
 console.log(`=== BOHB Optimization ===`);
@@ -283,7 +283,7 @@ if (bestParams) {
     .get(tradingName)
     .create(tradingCfg);
 
-  const bestDiscovery = new FileDiscovery(fileDiscCfg);
+  const bestDiscovery = FileDiscovery({ topN: 20 });
   const sc: SimConfig = {
     initialCapital: 10000,
     targetPositions: (portfolioCfg.targetPositions as number) ?? 5,

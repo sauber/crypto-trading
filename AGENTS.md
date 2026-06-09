@@ -1,11 +1,13 @@
 # KuCoin Crypto Trading Agent
 
+> See this file for complete architecture, roles, interfaces, and migration plan. Follow SOLID principles and TDD.
+
 ## Architecture
 
 6-role pipeline executed every trading cycle (1h):
 
 ```
-Discovery → Portfolio → Trading → Execution → Reflection → Communication
+Discovery → Portfolio → Trading → Execution → Reflection → Logging
 ```
 
 See per-component AGENTS.md for interface details:
@@ -14,7 +16,7 @@ See per-component AGENTS.md for interface details:
 - [`src/trading/AGENTS.md`](src/trading/AGENTS.md) — timing via technical indicators (RSI, MACD, BB, EMA+ADX)
 - [`src/execution/AGENTS.md`](src/execution/AGENTS.md) — simulated or live KuCoin market orders
 - [`src/reflection/AGENTS.md`](src/reflection/AGENTS.md) — decision logging + outcome analysis
-- [`src/communication/AGENTS.md`](src/communication/AGENTS.md) — status reporting
+- [`src/communication/AGENTS.md`](src/communication/AGENTS.md) — cycle logging + event journal
 - [`src/engine/AGENTS.md`](src/engine/AGENTS.md) — pipeline simulate, live engine, shared types
 - [`src/position/AGENTS.md`](src/position/AGENTS.md) — portfolio state initialization
 - [`src/registry/AGENTS.md`](src/registry/AGENTS.md) — strategy registration & lookup
@@ -56,7 +58,7 @@ deno test --allow-read          # Run tests
 
 - TypeScript, strict mode, Deno runtime
 - `import type` for type-only imports
-- CamelCase for files, kebab-case for strategy names
+- kebab-case for files, CamelCase for strategy names
 - Tests alongside code: `{name}.test.ts`
 - Cross-module imports go through target module's `mod.ts`
 - Intra-module imports use direct `./file.ts` paths
@@ -75,7 +77,7 @@ src/
 ├── portfolio/            Rank-trend portfolio strategy
 ├── trading/              Technical indicator trading strategies
 ├── execution/            Simulated + KuCoin execution
-├── communication/        Silent + verbose reporting
+├── communication/        Logger (silent / line-journal / dashboard)
 ├── reflection/           Noop + analyst reflection
 ├── position/             Portfolio state loaders (blank + KuCoin)
 ├── registry/             RoleRegistry + strategy registration

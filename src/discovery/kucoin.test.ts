@@ -20,8 +20,8 @@ Deno.test("KucoinDiscovery fetches from client.getTopVolumeSymbols", async () =>
       Promise.resolve([mockKline(100, 10)]),
   } as unknown as KucoinClient;
 
-  const d = new KucoinDiscovery({ topN: 5 }, client);
-  const result = await d.discover();
+  const d = KucoinDiscovery({ topN: 5 }, client);
+  const result = await d();
   if (!called) throw new Error("getTopVolumeSymbols was not called");
   if (result.length !== 1) throw new Error(`expected 1, got ${result.length}`);
 });
@@ -36,8 +36,8 @@ Deno.test("KucoinDiscovery computes liquidity from last kline", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = new KucoinDiscovery({ topN: 5 }, client);
-  const result = await d.discover();
+  const d = KucoinDiscovery({ topN: 5 }, client);
+  const result = await d();
   if (result[0].score !== 1000) throw new Error(`BTC score expected 1000, got ${result[0].score}`);
   if (result[1].score !== 1000) throw new Error(`ETH score expected 1000, got ${result[1].score}`);
 });
@@ -49,8 +49,8 @@ Deno.test("KucoinDiscovery respects topN config", async () => {
     getKlines: () => Promise.resolve([mockKline(100, 1)]),
   } as unknown as KucoinClient;
 
-  const d = new KucoinDiscovery({ topN: 2 }, client);
-  const result = await d.discover();
+  const d = KucoinDiscovery({ topN: 2 }, client);
+  const result = await d();
   if (result.length !== 2) throw new Error(`expected 2, got ${result.length}`);
 });
 
@@ -64,8 +64,8 @@ Deno.test("KucoinDiscovery skips symbols with no klines", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = new KucoinDiscovery({ topN: 5 }, client);
-  const result = await d.discover();
+  const d = KucoinDiscovery({ topN: 5 }, client);
+  const result = await d();
   if (result.length !== 2) throw new Error(`expected 2 (A and C), got ${result.length}`);
   if (result.some((c: { symbol: string }) => c.symbol === "B")) throw new Error("B should be excluded");
 });
@@ -80,8 +80,8 @@ Deno.test("KucoinDiscovery skips symbols when getKlines throws", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = new KucoinDiscovery({ topN: 5 }, client);
-  const result = await d.discover();
+  const d = KucoinDiscovery({ topN: 5 }, client);
+  const result = await d();
   if (result.length !== 1) throw new Error(`expected 1 (only A), got ${result.length}`);
   if (result[0].symbol !== "A") throw new Error(`expected A, got ${result[0].symbol}`);
 });
@@ -97,7 +97,7 @@ Deno.test("KucoinDiscovery sorts descending by score", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = new KucoinDiscovery({ topN: 5 }, client);
-  const result = await d.discover();
+  const d = KucoinDiscovery({ topN: 5 }, client);
+  const result = await d();
   if (result[0].symbol !== "B") throw new Error(`first should be B (500), got ${result[0].symbol}`);
 });

@@ -1,0 +1,4 @@
+{
+  "name": "Crypto Trader Dev Container",
+  "dockerFile": "Dockerfile"
+}

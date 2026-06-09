@@ -1,14 +1,9 @@
-import type { DiscoveryStrategy, DiscoveryConfig, DiscoveryParams, CoinCandidate } from "./types.ts";
+import type { DiscoveryStrategy, DiscoveryParams, CoinCandidate } from "./types.ts";
 
-export class FileDiscovery implements DiscoveryStrategy {
-  readonly name = "testdata";
-  readonly config: DiscoveryConfig;
+export function FileDiscovery(config?: { topN?: number }): DiscoveryStrategy {
+  const topN = config?.topN ?? 20;
 
-  constructor(config?: Partial<DiscoveryConfig>) {
-    this.config = { topN: 20, ...config };
-  }
-
-  async discover(params?: DiscoveryParams): Promise<CoinCandidate[]> {
+  const strategy = async (params?: DiscoveryParams): Promise<CoinCandidate[]> => {
     if (!params?.klines || params.klines.size === 0) return [];
 
     const { klines, barIndex } = params;
@@ -26,6 +21,9 @@ export class FileDiscovery implements DiscoveryStrategy {
     }
 
     candidates.sort((a, b) => b.score - a.score);
-    return candidates.slice(0, this.config.topN);
-  }
+    return candidates.slice(0, topN);
+  };
+
+  Object.defineProperty(strategy, "name", { value: "testdata" });
+  return strategy;
 }

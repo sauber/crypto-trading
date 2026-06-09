@@ -1,95 +1,69 @@
 import { pipelineSimulate } from "./simulate.ts";
 import { FileDiscovery } from "../discovery/testdata.ts";
-import type { PortfolioStrategy, PortfolioConfig } from "../portfolio/mod.ts";
-import type { TradingStrategy, TradingConfig } from "../trading/mod.ts";
+import type { PortfolioStrategy } from "../portfolio/mod.ts";
+import type { TradingStrategy } from "../trading/mod.ts";
 import type { Kline } from "../kucoin/mod.ts";
 import type { PositionState, PortfolioDecision, SwapPlan } from "./types.ts";
 import type { CoinCandidate } from "../discovery/mod.ts";
 
-class AlwaysBuyPortfolio implements PortfolioStrategy {
-  readonly name = "always-buy";
-  readonly config: PortfolioConfig = { targetPositions: 5, allocationMethod: "equal" };
-
-  async analyze(
-    params: {
-      candidates: CoinCandidate[];
-      activePositions: PositionState[];
-      prices: Map<string, number>;
-      client: unknown;
-      interval: string;
-      candleRangeMs: number;
-    },
-  ): Promise<PortfolioDecision> {
-    return {
-      wantToBuy: params.candidates.map((c) => ({
-        symbol: c.symbol,
-        confidence: 100,
-        reason: "always-buy",
-      })),
-      wantToSell: [],
-    };
-  }
+function alwaysBuyPortfolio(): PortfolioStrategy {
+  const strategy = (
+    _activePositions: PositionState[],
+    candidates: CoinCandidate[],
+  ): PortfolioDecision => ({
+    wantToBuy: candidates.map((c) => ({
+      symbol: c.symbol,
+      confidence: 100,
+      reason: "always-buy",
+    })),
+    wantToSell: [],
+  });
+  Object.defineProperty(strategy, "name", { value: "always-buy" });
+  return strategy;
 }
 
-class RotatePortfolio implements PortfolioStrategy {
-  readonly name = "rotate";
-  readonly config: PortfolioConfig = { targetPositions: 5, allocationMethod: "equal" };
-  private bar = 0;
+function rotatePortfolio(): PortfolioStrategy {
+  let bar = 0;
+  const strategy = (
+    activePositions: PositionState[],
+    candidates: CoinCandidate[],
+  ): PortfolioDecision => {
+    bar++;
+    const held = new Set(activePositions.map((p) => p.symbol));
 
-  async analyze(
-    params: {
-      candidates: CoinCandidate[];
-      activePositions: PositionState[];
-      prices: Map<string, number>;
-      client: unknown;
-      interval: string;
-      candleRangeMs: number;
-    },
-  ): Promise<PortfolioDecision> {
-    this.bar++;
-    const held = new Set(params.activePositions.map((p) => p.symbol));
-
-    if (this.bar % 15 === 0) {
+    if (bar % 15 === 0) {
       return {
         wantToBuy: [],
-        wantToSell: params.activePositions.map((p) => ({
+        wantToSell: activePositions.map((p) => ({
           symbol: p.symbol,
           reason: "rotate-sell",
         })),
       };
     }
 
-    const candidates = params.candidates.filter((c) => !held.has(c.symbol));
+    const filtered = candidates.filter((c) => !held.has(c.symbol));
     return {
-      wantToBuy: candidates.slice(0, 1).map((c) => ({
+      wantToBuy: filtered.slice(0, 1).map((c) => ({
         symbol: c.symbol,
         confidence: 100,
         reason: "rotate-buy",
       })),
       wantToSell: [],
     };
-  }
+  };
+  Object.defineProperty(strategy, "name", { value: "rotate" });
+  return strategy;
 }
 
-class FirstCoinTrading implements TradingStrategy {
-  readonly name = "first-coin";
-  readonly config: TradingConfig = {
-    rsiPeriod: 14,
-    rsiOversold: 30,
-    rsiOverbought: 70,
-    minConfidence: 50,
-  };
-
-  async plan(
-    params: {
-      wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
-      wantToSell: Array<{ symbol: string; reason: string }>;
-      activePositions: PositionState[];
-      prices: Map<string, number>;
-      klines: Map<string, Kline[]>;
-      targetPositions: number;
-    },
-  ): Promise<SwapPlan> {
+function firstCoinTrading(): TradingStrategy {
+  const strategy = (params: {
+    wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
+    wantToSell: Array<{ symbol: string; reason: string }>;
+    activePositions: PositionState[];
+    prices: Map<string, number>;
+    klines: Map<string, Kline[]>;
+    targetPositions: number;
+  }): SwapPlan => {
     const activeCount = params.activePositions.length;
     const slotsLeft = params.targetPositions - activeCount;
 
@@ -100,28 +74,20 @@ class FirstCoinTrading implements TradingStrategy {
     }));
 
     return { swaps };
-  }
+  };
+  Object.defineProperty(strategy, "name", { value: "first-coin" });
+  return strategy;
 }
 
-class RotateTrading implements TradingStrategy {
-  readonly name = "rotate";
-  readonly config: TradingConfig = {
-    rsiPeriod: 14,
-    rsiOversold: 30,
-    rsiOverbought: 70,
-    minConfidence: 50,
-  };
-
-  async plan(
-    params: {
-      wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
-      wantToSell: Array<{ symbol: string; reason: string }>;
-      activePositions: PositionState[];
-      prices: Map<string, number>;
-      klines: Map<string, Kline[]>;
-      targetPositions: number;
-    },
-  ): Promise<SwapPlan> {
+function rotateTrading(): TradingStrategy {
+  const strategy = (params: {
+    wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
+    wantToSell: Array<{ symbol: string; reason: string }>;
+    activePositions: PositionState[];
+    prices: Map<string, number>;
+    klines: Map<string, Kline[]>;
+    targetPositions: number;
+  }): SwapPlan => {
     const swaps: Array<{ sellSymbol: string; buySymbol: string; reason: string }> = [];
 
     for (const sell of params.wantToSell) {
@@ -141,7 +107,9 @@ class RotateTrading implements TradingStrategy {
     }
 
     return { swaps };
-  }
+  };
+  Object.defineProperty(strategy, "name", { value: "rotate" });
+  return strategy;
 }
 
 function makeKlines(nBars: number, startPrice = 100, step = 0.5): Kline[] {
@@ -167,9 +135,9 @@ Deno.test("pipelineSimulate returns correct PipelineResult structure", async () 
   for (const coin of coins) klines.set(coin, makeKlines(100));
 
   const result = await pipelineSimulate({
-    discoveryStrategy: new FileDiscovery({ topN: coins.length }),
-    portfolioStrategy: new AlwaysBuyPortfolio(),
-    tradingStrategy: new FirstCoinTrading(),
+    discoveryStrategy: FileDiscovery({ topN: coins.length }),
+    portfolioStrategy: alwaysBuyPortfolio(),
+    tradingStrategy: firstCoinTrading(),
     klines,
     coins,
     interval: "1hour",
@@ -205,14 +173,14 @@ Deno.test("pipelineSimulate with insufficient data throws", async () => {
   let threw = false;
   try {
     await pipelineSimulate({
-      discoveryStrategy: new FileDiscovery({ topN: coins.length }),
-      portfolioStrategy: new AlwaysBuyPortfolio(),
-      tradingStrategy: new FirstCoinTrading(),
-      klines,
-      coins,
-      interval: "1hour",
-      config: { initialCapital: 1000, targetPositions: 3, fee: 0.001 },
-    });
+      discoveryStrategy: FileDiscovery({ topN: coins.length }),
+    portfolioStrategy: alwaysBuyPortfolio(),
+    tradingStrategy: firstCoinTrading(),
+    klines,
+    coins,
+    interval: "1hour",
+    config: { initialCapital: 1000, targetPositions: 3, fee: 0.001 },
+  });
   } catch {
     threw = true;
   }
@@ -225,9 +193,9 @@ Deno.test("pipelineSimulate with multiple coins respects targetPositions limit",
   for (const coin of coins) klines.set(coin, makeKlines(100));
 
   const result = await pipelineSimulate({
-    discoveryStrategy: new FileDiscovery({ topN: coins.length }),
-    portfolioStrategy: new AlwaysBuyPortfolio(),
-    tradingStrategy: new FirstCoinTrading(),
+    discoveryStrategy: FileDiscovery({ topN: coins.length }),
+    portfolioStrategy: alwaysBuyPortfolio(),
+    tradingStrategy: firstCoinTrading(),
     klines,
     coins,
     interval: "1hour",
@@ -246,9 +214,9 @@ Deno.test("pipelineSimulate records trades when positions are sold", async () =>
   for (const coin of coins) klines.set(coin, makeKlines(200, 100, 0.3));
 
   const result = await pipelineSimulate({
-    discoveryStrategy: new FileDiscovery({ topN: coins.length }),
-    portfolioStrategy: new RotatePortfolio(),
-    tradingStrategy: new RotateTrading(),
+    discoveryStrategy: FileDiscovery({ topN: coins.length }),
+    portfolioStrategy: rotatePortfolio(),
+    tradingStrategy: rotateTrading(),
     klines,
     coins,
     interval: "1hour",

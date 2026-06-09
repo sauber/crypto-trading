@@ -22,8 +22,9 @@ class RoleRegistry<T> {
 | `portfolioRegistry` | `rank-trend` |
 | `tradingRegistry` | `rsi-timed`, `macd-timed`, `bb-timed`, `ema-adx-timed` |
 | `executionRegistry` | `simulate`, `kucoin` |
-| `commRegistry` | `silent`, `verbose` |
 | `reflectionRegistry` | `noop`, `analyst` |
+
+> Logger is not registered via registry — it's passed directly to engine factories.
 
 ## OCP
 

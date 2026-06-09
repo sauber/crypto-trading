@@ -1,9 +1,7 @@
 import { pipelineSimulate } from "./simulate.ts";
 import { FileDiscovery } from "../discovery/testdata.ts";
-import { config as fileDiscCfg } from "../discovery/testdata.config.ts";
 import { RankTrendPortfolio } from "../portfolio/rank-trend.ts";
-import { config as rankTrendCfg } from "../portfolio/rank-trend.config.ts";
-import { RsiTimedTrading, rsiTimedCfg } from "../trading/mod.ts";
+import { RsiTimed } from "../trading/mod.ts";
 import type { Kline } from "../kucoin/mod.ts";
 
 function makeKlines(
@@ -39,9 +37,9 @@ Deno.test("pipeline with rank-trend + rsi-timed produces valid results", async (
   }
 
   const result = await pipelineSimulate({
-    discoveryStrategy: new FileDiscovery(fileDiscCfg),
-    portfolioStrategy: new RankTrendPortfolio(rankTrendCfg),
-    tradingStrategy: new RsiTimedTrading(rsiTimedCfg),
+    discoveryStrategy: FileDiscovery({ topN: coins.length }),
+    portfolioStrategy: RankTrendPortfolio(5),
+    tradingStrategy: RsiTimed(),
     klines,
     coins,
     interval: "1hour",
@@ -95,9 +93,9 @@ Deno.test("pipeline with rank-trend buys improving-rank coins", async () => {
   klines.set("ETH-USDT", ethKlines);
 
   const result = await pipelineSimulate({
-    discoveryStrategy: new FileDiscovery(fileDiscCfg),
-    portfolioStrategy: new RankTrendPortfolio(rankTrendCfg),
-    tradingStrategy: new RsiTimedTrading(rsiTimedCfg),
+    discoveryStrategy: FileDiscovery({ topN: coins.length }),
+    portfolioStrategy: RankTrendPortfolio(5),
+    tradingStrategy: RsiTimed(),
     klines,
     coins,
     interval: "1hour",

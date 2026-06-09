@@ -1,6 +1,8 @@
 import type { PortfolioStrategy } from "../portfolio/mod.ts";
 import type { TradingStrategy } from "../trading/mod.ts";
 import type { DiscoveryStrategy } from "../discovery/mod.ts";
+import type { Logger } from "../communication/mod.ts";
+import { SilentLogger } from "../communication/mod.ts";
 import type { Kline } from "../kucoin/mod.ts";
 import type { PositionState, PipelineResult, TradeRecord } from "./types.ts";
 
@@ -9,7 +11,6 @@ export interface SimConfig {
   targetPositions: number;
   fee: number;
   startBar?: number;
-  verbose?: boolean;
 }
 
 export interface SimParams {
@@ -20,10 +21,12 @@ export interface SimParams {
   coins: string[];
   interval: string;
   config: SimConfig;
+  logger?: Logger;
 }
 
 export async function pipelineSimulate(params: SimParams): Promise<PipelineResult> {
   const { discoveryStrategy, portfolioStrategy, tradingStrategy, klines, coins, interval, config } = params;
+  const logger = params.logger ?? SilentLogger();
   const { initialCapital, targetPositions, fee } = config;
   const startBar = config.startBar ?? 50;
 
@@ -33,13 +36,16 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
     throw new Error(`Not enough data: need >${startBar} bars, got ${minBars}`);
   }
 
+  for (const [, bars] of klines) {
+    bars.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
   let capital = initialCapital;
   const positions = new Map<string, PositionState>();
   const trades: TradeRecord[] = [];
   const equityCurve: number[] = [initialCapital];
   let peak = initialCapital;
   let maxDD = 0;
-  const verbose = config.verbose ?? true;
 
   const barTime = (b: number): string =>
     new Date((klines.get(coins[0]) || [])[b]?.timestamp ?? 0).toISOString().slice(0, 16).replace("T", " ");
@@ -57,7 +63,7 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
       if (k && k.length > bar) prices.set(coin, k[bar].close);
     }
 
-    const candidates = await discoveryStrategy.discover({ klines, barIndex: bar });
+    const candidates = await discoveryStrategy({ klines, barIndex: bar });
 
     const activePositions = [...positions.values()];
 
@@ -71,14 +77,7 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
     if (dd > maxDD) maxDD = dd;
     equityCurve.push(equity);
 
-    const decision = await portfolioStrategy.analyze({
-      candidates,
-      activePositions,
-      prices,
-      client: undefined as any,
-      interval,
-      candleRangeMs: 0,
-    });
+    const decision = portfolioStrategy(activePositions, candidates);
 
     const klinesUpToBar = new Map<string, Kline[]>();
     for (const coin of coins) {
@@ -86,7 +85,7 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
       if (k) klinesUpToBar.set(coin, k.slice(0, bar + 1));
     }
 
-    const plan = await tradingStrategy.plan({
+    const plan = tradingStrategy({
       wantToBuy: decision.wantToBuy,
       wantToSell: decision.wantToSell,
       activePositions,
@@ -95,37 +94,69 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
       targetPositions,
     });
 
-    const hadTrades = plan.swaps.length > 0;
-
-    if (verbose && hadTrades) {
-      console.log(`\n── Cycle ${bar - startBar + 1} @ ${barTime(bar)} ──`);
+    for (const swap of plan.swaps) {
+      const parts: string[] = [];
+      if (swap.sellSymbol) parts.push(`Sell ${swap.sellSymbol}`);
+      if (swap.buySymbol) parts.push(`Buy ${swap.buySymbol}`);
+      logger({
+        timestamp: barTime(bar),
+        role: "TR",
+        action: "signal",
+        reason: swap.reason,
+        message: parts.join(" → "),
+      });
     }
 
-    if (verbose && hadTrades) {
-      const eq = equityCurve[equityCurve.length - 1];
-      console.log(`   Equity: $${eq.toFixed(2)} | Capital: $${capital.toFixed(2)}`);
+    const hadTrades = plan.swaps.length > 0;
 
-      // Portfolio: current positions
+    if (hadTrades) {
+      const ts = barTime(bar);
+      logger({
+        timestamp: ts,
+        cycle: bar - startBar + 1,
+        action: "cycle",
+        message: `Cycle ${bar - startBar + 1} @ ${ts}`,
+      });
+
+      const eq = equityCurve[equityCurve.length - 1];
+      logger({
+        timestamp: ts,
+        action: "equity",
+        message: `Equity: $${eq.toFixed(2)} | Capital: $${capital.toFixed(2)}`,
+      });
+
       if (positions.size > 0) {
-        console.log(`   Portfolio (${positions.size}):`);
         for (const line of fmtPositions(positions, prices)) {
-          console.log(`     ${line}`);
+          logger({ timestamp: ts, action: "portfolio", message: line });
         }
       } else {
-        console.log(`   Portfolio: (empty)`);
+        logger({ timestamp: ts, action: "portfolio", message: "Portfolio: (empty)" });
       }
 
-      // Trading: wanted / unwanted signals
       if (decision.wantToBuy.length > 0) {
-        console.log(`   Want to buy (${decision.wantToBuy.length}):`);
         for (const b of decision.wantToBuy) {
-          console.log(`     ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`);
+          logger({
+            timestamp: ts,
+            role: "PO",
+            action: "decision",
+            side: "buy",
+            symbol: b.symbol,
+            reason: b.reason,
+            message: `Want to buy ${b.symbol} confidence=${b.confidence} ${b.reason}`,
+          });
         }
       }
       if (decision.wantToSell.length > 0) {
-        console.log(`   Want to sell (${decision.wantToSell.length}):`);
         for (const s of decision.wantToSell) {
-          console.log(`     ${s.symbol.padEnd(12)} ${s.reason}`);
+          logger({
+            timestamp: ts,
+            role: "PO",
+            action: "decision",
+            side: "sell",
+            symbol: s.symbol,
+            reason: s.reason,
+            message: `Want to sell ${s.symbol} ${s.reason}`,
+          });
         }
       }
     }
@@ -157,9 +188,15 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
           });
           capital += proceeds;
           positions.delete(swap.sellSymbol);
-          if (verbose && hadTrades) {
-            console.log(`   ─ Sell ${swap.sellSymbol}: ${pos.size.toFixed(4)} coins @ $${sellPrice.toFixed(4)} = $${gross.toFixed(2)} - fee $${feeAmt.toFixed(4)} → $${proceeds.toFixed(2)} received`);
-          }
+          logger({
+            timestamp: barTime(bar),
+            role: "EX",
+            action: "sell",
+            side: "sell",
+            symbol: swap.sellSymbol,
+            reason: swap.reason,
+            message: `Sell ${swap.sellSymbol}: ${pos.size.toFixed(4)} coins @ $${sellPrice.toFixed(4)} = $${gross.toFixed(2)} - fee $${feeAmt.toFixed(4)} → $${proceeds.toFixed(2)} received`,
+          });
         }
       }
 
@@ -180,9 +217,15 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
             enteredAt: bar,
             entryValue: spend,
           });
-          if (verbose && hadTrades) {
-            console.log(`   ─ Buy  ${swap.buySymbol}: ${size.toFixed(4)} coins @ $${buyPrice.toFixed(4)} = $${spend.toFixed(2)} spent (fee $${buyFee.toFixed(4)})`);
-          }
+          logger({
+            timestamp: barTime(bar),
+            role: "EX",
+            action: "buy",
+            side: "buy",
+            symbol: swap.buySymbol,
+            reason: swap.reason,
+            message: `Buy  ${swap.buySymbol}: ${size.toFixed(4)} coins @ $${buyPrice.toFixed(4)} = $${spend.toFixed(2)} spent (fee $${buyFee.toFixed(4)})`,
+          });
         }
       }
     }

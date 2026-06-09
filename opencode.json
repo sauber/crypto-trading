@@ -1,20 +1,4 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "agent": {
-    "trader": {
-      "description": "Helper agent to develop and maintain the KuCoin trading agent",
-      "mode": "subagent",
-      "permission": {
-        "read": "allow",
-        "edit": "allow",
-        "bash": "allow",
-        "glob": "allow",
-        "grep": "allow"
-      }
-    }
-  },
-  "customInstructions": "See AGENTS.md for complete architecture, roles, interfaces, and migration plan. Follow SOLID principles and TDD.",
-  "documentation": [
-    "AGENTS.md"
-  ]
+  "instructions": ["AGENTS.md"]
 }

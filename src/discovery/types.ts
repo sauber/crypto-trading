@@ -16,7 +16,6 @@ export interface DiscoveryParams {
 }
 
 export interface DiscoveryStrategy {
+  (params?: DiscoveryParams): Promise<CoinCandidate[]>;
   readonly name: string;
-  readonly config: DiscoveryConfig;
-  discover(params?: DiscoveryParams): Promise<CoinCandidate[]>;
 }
