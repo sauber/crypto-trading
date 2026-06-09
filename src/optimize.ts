@@ -1,13 +1,13 @@
-import type { Kline } from "./kucoin/types.ts";
+import type { Kline } from "./kucoin/mod.ts";
 import { pipelineSimulate } from "./engine/simulate.ts";
 import type { SimConfig } from "./engine/simulate.ts";
 import { FileDiscovery } from "./discovery/testdata.ts";
 import { config as fileDiscCfg } from "./discovery/testdata.config.ts";
-import { ROLE_CONFIG } from "./roles/config.ts";
+import { ROLE_CONFIG } from "./config.ts";
 import {
   portfolioRegistry,
   tradingRegistry,
-} from "./roles/registration.ts";
+} from "./registry/registration.ts";
 
 const CANDLE_INTERVAL = "1hour";
 const MIN_DAYS = 15;

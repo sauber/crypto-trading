@@ -5,18 +5,35 @@ description: KuCoin crypto trading agent with 6-role pipeline architecture. Type
 
 ## Architecture (see AGENTS.md for details)
 
-The system consists of 6 roles, executed in a pipeline every hour:
+6-role pipeline executed every trading cycle (1h):
 
 ```
 Discovery → Portfolio → Trading → Execution → Reflection → Communication
 ```
 
-- **Discovery**: Find top 20 USDT-pairs by 24h volume (fast, not optimizable)
-- **Portfolio**: Assess wanted/unwanted coins based on rank change. Allocate position sizing.
-- **Trading**: Timing of swaps via technical indicators (RSI, MACD, BB). Signal on BOTH buy and sell coin.
-- **Execution**: Execute swaps — simulated (capital × (1-fee)) or live (KuCoin market order).
-- **Reflection**: Collect decisions + outcomes, analyze success/failure (live only).
-- **Communication**: Report status — silent in backtest, verbose in live.
+- **Discovery**: Find top 20 USDT-pairs by 24h volume
+- **Portfolio**: Assess wanted/unwanted coins based on rank change; position sizing
+- **Trading**: Timing of swaps via technical indicators (RSI, MACD, BB, EMA+ADX)
+- **Execution**: Simulated (capital × (1-fee)) or live KuCoin market orders
+- **Reflection**: Collect decisions + outcomes, analyze success/failure (live only)
+- **Communication**: Report status — silent in backtest, verbose in live
+
+## Module structure
+
+Flat top-level modules under `src/`:
+
+| Module | Contents |
+|--------|----------|
+| `engine/` | Pipeline simulate, live engine, shared types |
+| `discovery/` | Top-volume coin discovery (testdata, kucoin) |
+| `portfolio/` | Rank-trend portfolio strategy |
+| `trading/` | RSI, MACD, BB, EMA+ADX timed strategies |
+| `execution/` | Simulated + KuCoin execution |
+| `communication/` | Silent + verbose reporting |
+| `reflection/` | Noop + analyst reflection |
+| `position/` | Blank + KuCoin portfolio loaders |
+| `registry/` | RoleRegistry + all strategy registrations |
+| `kucoin/` | KuCoin REST API client + types |
 
 ## Key concepts
 
@@ -25,7 +42,7 @@ Discovery → Portfolio → Trading → Execution → Reflection → Communicati
 - **Pipeline backtest**: Entire pipeline runs bar-by-bar (not per-strategy isolation)
 - **Optimization**: BOHB over (portfolio_strat × portfolio_params) × (trading_strat × trading_params)
 - **Data**: `data/klines.json` downloaded by `deno task testdata` — no API calls during backtest/optimize
-- **SOLID**: Single Responsibility per rolle, Open/Closed via RoleRegistry, Dependency Inversion via interfaces
+- **SOLID**: Single Responsibility per module, Open/Closed via RoleRegistry, Dependency Inversion via interfaces
 
 ## Environment variables
 
@@ -49,8 +66,8 @@ deno test --allow-read          # Run tests
 
 ## Development notes
 
-- Each strategy has its own directory with `strategy.ts` + `config.ts`
-- Strategy names in `kebab-case`
+- Each strategy is a single file in its component directory, config in `<name>.config.ts`
+- Cross-module imports go through `mod.ts`; intra-module uses direct `./file.ts` paths
 - `import type` for type-only imports
 - Write tests BEFORE implementation (TDD)
-- See AGENTS.md for complete architecture, interfaces, and migration plan
+- See `AGENTS.md` and per-component `AGENTS.md` for interfaces and architecture

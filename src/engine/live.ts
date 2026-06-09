@@ -1,11 +1,12 @@
-import type { PortfolioStrategy } from "../roles/portfolio/types.ts";
-import type { TradingStrategy } from "../roles/trading/types.ts";
-import type { ExecutionStrategy } from "../roles/execution/types.ts";
-import type { CommunicationStrategy } from "../roles/communication/types.ts";
-import type { ReflectionStrategy } from "../roles/reflection/types.ts";
-import type { DiscoveryStrategy } from "../discovery/types.ts";
-import { KucoinClient } from "../kucoin/client.ts";
-import type { Kline } from "../kucoin/types.ts";
+import type { PortfolioStrategy } from "../portfolio/mod.ts";
+import type { TradingStrategy } from "../trading/mod.ts";
+import type { ExecutionStrategy } from "../execution/mod.ts";
+import type { CommunicationStrategy } from "../communication/mod.ts";
+import type { ReflectionStrategy } from "../reflection/mod.ts";
+import type { DiscoveryStrategy } from "../discovery/mod.ts";
+import type { PositionLoader } from "../position/mod.ts";
+import { KucoinClient } from "../kucoin/mod.ts";
+import type { Kline } from "../kucoin/mod.ts";
 import type { PositionState, PortfolioDecision, PipelineResult, TradeRecord } from "./types.ts";
 
 export interface LiveEngineConfig {
@@ -16,6 +17,7 @@ export interface LiveEngineConfig {
   execution: ExecutionStrategy;
   communication: CommunicationStrategy;
   reflection: ReflectionStrategy;
+  positionLoader: PositionLoader;
   intervalMs: number;
   targetPositions: number;
   candleInterval: string;
@@ -79,61 +81,21 @@ export class TradingEngine {
   }
 
   private async loadInitialPositions(): Promise<void> {
-    const { client, reserveSymbol, candleInterval, candleRangeMs } = this.config;
+    const loader = this.config.positionLoader;
 
     console.log("=== Initializing portfolio ===");
-    const balances = await client.getBalances();
-    const activeBalances = balances.filter(
-      (b) => parseFloat(b.available) > 0 && b.currency !== reserveSymbol,
-    );
+    this.initialPositions = await loader.loadPositions();
 
-    if (activeBalances.length === 0) {
+    if (this.initialPositions.length === 0) {
       console.log("No existing positions found.\n");
       return;
     }
 
-    const now = Date.now();
-
-    for (const b of activeBalances) {
-      const symbol = `${b.currency}-USDT`;
-      try {
-        const ticker = await client.getTicker(symbol);
-        const price = ticker.last;
-        const size = parseFloat(b.available);
-        const value = size * price;
-        this.initialPositions.push({
-          symbol,
-          entryPrice: price,
-          size,
-          enteredAt: now - candleRangeMs,
-          entryValue: value,
-        });
-        console.log(
-          `  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`,
-        );
-      } catch {
-        try {
-          const klines = await client.getKlines(symbol, candleInterval, now - candleRangeMs, now);
-          if (klines.length > 0) {
-            const price = klines[klines.length - 1].close;
-            const size = parseFloat(b.available);
-            const value = size * price;
-            this.initialPositions.push({
-              symbol,
-              entryPrice: price,
-              size,
-              enteredAt: now - candleRangeMs,
-              entryValue: value,
-            });
-            console.log(
-              `  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`,
-            );
-          }
-        } catch {
-          const size = parseFloat(b.available);
-          console.log(`  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} (could not fetch price)`);
-        }
-      }
+    for (const p of this.initialPositions) {
+      const currency = p.symbol.replace("-USDT", "");
+      console.log(
+        `  ${currency.padEnd(10)} ${p.size.toFixed(4).padStart(12)} @ $${p.entryPrice.toFixed(4).padStart(10)} = $${p.entryValue.toFixed(2)}`,
+      );
     }
 
     console.log(`\nTotal ${this.initialPositions.length} positions, ` +

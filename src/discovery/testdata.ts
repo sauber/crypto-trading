@@ -1,5 +1,4 @@
-import type { DiscoveryStrategy, DiscoveryConfig, DiscoveryParams } from "./types.ts";
-import type { CoinCandidate } from "../roles/types.ts";
+import type { DiscoveryStrategy, DiscoveryConfig, DiscoveryParams, CoinCandidate } from "./types.ts";
 
 export class FileDiscovery implements DiscoveryStrategy {
   readonly name = "testdata";

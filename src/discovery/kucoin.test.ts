@@ -1,6 +1,5 @@
 import { KucoinDiscovery } from "./kucoin.ts";
-import type { KucoinClient } from "../kucoin/client.ts";
-import type { LiquidityRanking, Kline } from "../kucoin/types.ts";
+import type { KucoinClient, LiquidityRanking, Kline } from "../kucoin/mod.ts";
 
 function mockRanking(symbol: string, volume24h = 1e6): LiquidityRanking {
   return { symbol, volume24h, lastPrice: 100, changeRate: 0.01 };

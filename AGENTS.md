@@ -2,230 +2,24 @@
 
 ## Architecture
 
-The system consists of 6 roles, each with its own strategy. The roles execute in a pipeline every time the trading cycle runs (every 1 hour).
+6-role pipeline executed every trading cycle (1h):
 
 ```
-  Discovery (fast: top-20 volume)
-       │
-       ▼ coins[]
-  Portfolio (assess wanted/unwanted based on rank change)
-       │
-       ▼ PortfolioDecision { wantToBuy, wantToSell }
-  Trading (timing via technical indicators: RSI, MACD, BB, etc.)
-       │
-       ▼ SwapPlan { swaps: [{ buy, sell }] }
-  Execution (simulated or live: capital × (1-fee) or KuCoin order)
-       │
-       ▼ positions updated
-  Reflection (live only: collect decisions + outcomes, report)
-  Communication (silent in backtest, verbose in live)
+Discovery → Portfolio → Trading → Execution → Reflection → Communication
 ```
 
-## Roles
+See per-component AGENTS.md for interface details:
+- [`src/discovery/AGENTS.md`](src/discovery/AGENTS.md) — top-volume coin discovery
+- [`src/portfolio/AGENTS.md`](src/portfolio/AGENTS.md) — want-to-buy/sell assessment + position sizing
+- [`src/trading/AGENTS.md`](src/trading/AGENTS.md) — timing via technical indicators (RSI, MACD, BB, EMA+ADX)
+- [`src/execution/AGENTS.md`](src/execution/AGENTS.md) — simulated or live KuCoin market orders
+- [`src/reflection/AGENTS.md`](src/reflection/AGENTS.md) — decision logging + outcome analysis
+- [`src/communication/AGENTS.md`](src/communication/AGENTS.md) — status reporting
+- [`src/engine/AGENTS.md`](src/engine/AGENTS.md) — pipeline simulate, live engine, shared types
+- [`src/position/AGENTS.md`](src/position/AGENTS.md) — portfolio state initialization
+- [`src/registry/AGENTS.md`](src/registry/AGENTS.md) — strategy registration & lookup
+- [`src/kucoin/AGENTS.md`](src/kucoin/AGENTS.md) — KuCoin REST API wrapper
 
-| Role | Responsibility | Interface | First strategy |
-|-------|---------------|-----------|-----------------|
-| **Discovery** | Find top 20 USDT-pairs by 24h volume | `DiscoveryStrategy` | `top-volume` |
-| **Portfolio** | Assess which coins are wanted/unwanted + position sizing | `PortfolioStrategy` | `rank-trend` |
-| **Trading** | Timing of swaps via technical indicators | `TradingStrategy` | `rsi-timed` |
-| **Execution** | Execute swaps (simulated or live) | `ExecutionStrategy` | `simulate` / `kucoin` |
-| **Reflection** | Collect decisions, reflect on success/failure | `ReflectionStrategy` | `noop` / `analyst` |
-| **Communication** | Report status | `CommunicationStrategy` | `silent` / `verbose` |
-
-## Interfaces
-
-### PortfolioStrategy
-
-```ts
-interface PortfolioStrategy {
-  readonly name: string;
-  readonly config: PortfolioConfig;
-  analyze(params: {
-    candidates: CoinCandidate[];       // From Discovery
-    activePositions: PositionState[];  // Current portfolio
-    prices: Map<string, number>;       // Current prices
-    client: KucoinClient;
-    interval: string;                  // "1hour"
-    candleRangeMs: number;
-  }): Promise<PortfolioDecision>;
-}
-
-interface PortfolioDecision {
-  wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
-  wantToSell: Array<{ symbol: string; reason: string }>;
-}
-```
-
-### TradingStrategy
-
-```ts
-interface TradingStrategy {
-  readonly name: string;
-  readonly config: TradingConfig;
-  plan(params: {
-    wantToBuy: Array<{ symbol: string; confidence: number; reason: string }>;
-    wantToSell: Array<{ symbol: string; reason: string }>;
-    activePositions: PositionState[];
-    prices: Map<string, number>;
-    klines: Map<string, Kline[]>;      // All coins' history for indicator calculation
-    maxPositions: number;
-  }): Promise<SwapPlan>;
-}
-
-interface SwapPlan {
-  swaps: Swap[];
-}
-
-interface Swap {
-  sellSymbol: string;
-  buySymbol: string;
-  reason: string;
-}
-```
-
-### ExecutionStrategy
-
-```ts
-interface ExecutionStrategy {
-  readonly name: string;
-  readonly config: ExecutionConfig;
-  executeSwaps(swaps: Swap[], positions: Map<string, PositionState>, capital: number): Promise<ExecutionResult>;
-}
-
-interface ExecutionResult {
-  positions: Map<string, PositionState>;
-  capital: number;
-  trades: TradeRecord[];
-}
-```
-
-### ReflectionStrategy
-
-```ts
-interface ReflectionStrategy {
-  readonly name: string;
-  readonly config: ReflectionConfig;
-  recordPrecondition(data: PreconditionRecord): void;
-  recordOutcome(data: OutcomeRecord): void;
-  reflect(): ReflectionInsight[];
-}
-```
-
-### CommunicationStrategy
-
-```ts
-interface CommunicationStrategy {
-  readonly name: string;
-  readonly config: CommunicationConfig;
-  report(result: PipelineResult | LiveCycleResult): void;
-  insight(insight: ReflectionInsight): void;
-  error(err: Error): void;
-}
-```
-
-## Pipeline Simulate (backtest/optimize)
-
-`src/engine/simulate.ts` — `pipelineSimulate()`:
-
-```
-Input:  portfolio Strategy, trading Strategy, data (klines, coins), config (maxPositions, capital, fee)
-Output: PipelineResult { equityCurve, trades, totalReturn, sharpe, maxDD, ... }
-
-For each bar in the timeline:
-  1. Portfolio.analyze() → PortfolioDecision
-  2. Trading.plan() → SwapPlan
-  3. Execution.executeSwaps() → update positions + capital
-  4. Repeat
-
-Note: Discovery is NOT run during simulate — coins is a fixed pool.
-Note: Reflection and Communication are NOT active in simulate.
-```
-
-## Data
-
-- Backtest and optimizer use `data/klines.json` (generated by `deno task testdata`)
-- No API calls during backtest/optimize
-- Format:
-  ```json
-  {
-    "interval": "1hour",
-    "coins": ["BTC-USDT", "ETH-USDT", ...],
-    "klines": { "BTC-USDT": [{ "timestamp": ..., "open": ..., "high": ..., "low": ..., "close": ..., "volume": ... }, ...] }
-  }
-  ```
-
-## Optimization
-
-```
-Search space: (portfolio_strat × portfolio_params) × (trading_strat × trading_params)
-First run: (rank-trend: 2 params) × (rsi-timed, macd-timed, bb-timed: 4 params each) = 24 combinations
-
-Method: BOHB (Bayesian Optimization + HyperBand)
-Number of evaluations: ~140 (approx. 20-40 min)
-```
-
-## Coding Standards
-
-### SOLID
-
-| Principle | How |
-|---------|---------|
-| **S**ingle Responsibility | Each role has one task. Each strategy has one analysis method. |
-| **O**pen/Closed | New strategies are added via `register()` in RoleRegistry — no existing code is changed. |
-| **L**iskov Substitution | All strategies implement the same interface; simulation and live can be swapped freely. |
-| **I**nterface Segregation | Each role has its own interface — no role depends on another role's interface. |
-| **D**ependency Inversion | Engine depends on abstract interfaces (PortfolioStrategy, TradingStrategy), not concrete strategies. |
-
-### TDD
-
-- Write tests BEFORE implementation
-- Test files: `src/**/*.test.ts`
-- Run tests: `deno test --allow-read --allow-net`
-- Mock strategies: create `AlwaysBuyTrading` / `AlwaysSellPortfolio` for pipeline test
-
-### Deno
-
-- TypeScript, strict mode (tsconfig)
-- `import type` for type-only imports
-- `export interface` for all contracts
-- Each strategy has its own directory with `strategy.ts` + `config.ts`
-- Convention: strategy names in `kebab-case`
-
-### Project Structure
-
-```
-src/
-├── trade.ts                        Entry point (live)
-├── backtest.ts                     Entry point (backtest)
-├── optimize.ts                     Entry point (optimize)
-├── indicators.ts                   Shared indicators (EMA, MACD, RSI, BB, ADX)
-├── engine/
-│   ├── types.ts                    PipelineResult, PositionState, Swap, SwapPlan, PortfolioDecision
-│   └── simulate.ts                 pipelineSimulate()
-├── kucoin/
-│   ├── client.ts                   KuCoin REST API wrapper
-│   └── types.ts                    Balance, Ticker, Kline, OrderRequest
-├── roles/
-│   ├── config.ts                   ROLE_CONFIG — active strategy per role
-│   ├── registry.ts                 RoleRegistry<T>
-│   ├── discovery/strategy.ts       TopVolume
-│   ├── portfolio/
-│   │   ├── types.ts                PortfolioStrategy interface
-│   │   └── strategies/rank-trend/  strategy.ts + config.ts
-│   ├── trading/
-│   │   ├── types.ts                TradingStrategy interface
-│   │   └── strategies/             rsi-timed/, macd-timed/, bb-timed/, ema-adx-timed/
-│   ├── execution/
-│   │   └── strategies/             simulate.ts, kucoin.ts
-│   ├── communication/
-│   │   └── strategies/             silent.ts, verbose.ts
-│   └── reflection/
-│       └── strategies/             noop.ts, analyst.ts
-scripts/
-└── download-data.ts                Fetch klines → data/klines.json
-data/
-└── klines.json                     Cached kline data (ignored by git)
-```
 ## Commands
 
 ```sh
@@ -245,3 +39,47 @@ deno test --allow-read          # Run tests
 | `KUCOIN_API_SECRET` | API secret |
 | `KUCOIN_API_PASSPHRASE` | API passphrase |
 | `DRY_RUN` | `"true"` = no real orders |
+
+## Coding Standards
+
+### SOLID
+
+| Principle | How |
+|---------|---------|
+| **S**ingle Responsibility | Each module has one task. Each strategy has one analysis method. |
+| **O**pen/Closed | New strategies registered via `RoleRegistry.register()` — no existing code changed. |
+| **L**iskov Substitution | All strategies implement the same interface; simulation and live are swappable. |
+| **I**nterface Segregation | Each role has its own interface — no role depends on another role's interface. |
+| **D**ependency Inversion | Engine depends on abstract interfaces, not concrete strategies. |
+
+### Conventions
+
+- TypeScript, strict mode, Deno runtime
+- `import type` for type-only imports
+- CamelCase for files, kebab-case for strategy names
+- Tests alongside code: `{name}.test.ts`
+- Cross-module imports go through target module's `mod.ts`
+- Intra-module imports use direct `./file.ts` paths
+
+## Project structure
+
+```
+src/
+├── trade.ts              Live entry point
+├── backtest.ts           Backtest entry point
+├── optimize.ts           BOHB optimizer entry point
+├── config.ts             ROLE_CONFIG — active strategies per role
+├── indicators.ts         Shared indicator functions
+├── engine/               Pipeline simulate + live engine + types
+├── discovery/            Top-volume coin discovery
+├── portfolio/            Rank-trend portfolio strategy
+├── trading/              Technical indicator trading strategies
+├── execution/            Simulated + KuCoin execution
+├── communication/        Silent + verbose reporting
+├── reflection/           Noop + analyst reflection
+├── position/             Portfolio state loaders (blank + KuCoin)
+├── registry/             RoleRegistry + strategy registration
+├── kucoin/               KuCoin REST API client + types
+data/
+└── klines.json           Cached kline data (generated by deno task testdata)
+```

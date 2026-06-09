@@ -1,6 +1,5 @@
-import type { DiscoveryStrategy, DiscoveryConfig, DiscoveryParams } from "./types.ts";
-import type { CoinCandidate } from "../roles/types.ts";
-import type { KucoinClient } from "../kucoin/client.ts";
+import type { DiscoveryStrategy, DiscoveryConfig, DiscoveryParams, CoinCandidate } from "./types.ts";
+import type { KucoinClient } from "../kucoin/mod.ts";
 
 const CANDIDATE_POOL = 50;
 const FETCH_INTERVAL = "1hour";

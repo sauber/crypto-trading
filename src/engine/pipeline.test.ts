@@ -1,11 +1,10 @@
 import { pipelineSimulate } from "./simulate.ts";
 import { FileDiscovery } from "../discovery/testdata.ts";
 import { config as fileDiscCfg } from "../discovery/testdata.config.ts";
-import { RankTrendPortfolio } from "../roles/portfolio/strategies/rank-trend/strategy.ts";
-import { config as rankTrendCfg } from "../roles/portfolio/strategies/rank-trend/config.ts";
-import { RsiTimedTrading } from "../roles/trading/strategies/rsi-timed/strategy.ts";
-import { config as rsiTimedCfg } from "../roles/trading/strategies/rsi-timed/config.ts";
-import type { Kline } from "../kucoin/types.ts";
+import { RankTrendPortfolio } from "../portfolio/rank-trend.ts";
+import { config as rankTrendCfg } from "../portfolio/rank-trend.config.ts";
+import { RsiTimedTrading, rsiTimedCfg } from "../trading/mod.ts";
+import type { Kline } from "../kucoin/mod.ts";
 
 function makeKlines(
   nBars: number,

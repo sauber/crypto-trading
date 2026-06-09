@@ -1,4 +1,4 @@
-import type { Kline } from "../kucoin/types.ts";
+import type { Kline } from "../kucoin/mod.ts";
 
 export interface PositionState {
   symbol: string;

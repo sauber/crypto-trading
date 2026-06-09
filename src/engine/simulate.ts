@@ -1,7 +1,7 @@
-import type { PortfolioStrategy } from "../roles/portfolio/types.ts";
-import type { TradingStrategy } from "../roles/trading/types.ts";
-import type { DiscoveryStrategy } from "../discovery/types.ts";
-import type { Kline } from "../kucoin/types.ts";
+import type { PortfolioStrategy } from "../portfolio/mod.ts";
+import type { TradingStrategy } from "../trading/mod.ts";
+import type { DiscoveryStrategy } from "../discovery/mod.ts";
+import type { Kline } from "../kucoin/mod.ts";
 import type { PositionState, PipelineResult, TradeRecord } from "./types.ts";
 
 export interface SimConfig {

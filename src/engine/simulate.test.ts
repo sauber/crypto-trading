@@ -1,10 +1,10 @@
 import { pipelineSimulate } from "./simulate.ts";
 import { FileDiscovery } from "../discovery/testdata.ts";
-import type { PortfolioStrategy, PortfolioConfig } from "../roles/portfolio/types.ts";
-import type { TradingStrategy, TradingConfig } from "../roles/trading/types.ts";
-import type { Kline } from "../kucoin/types.ts";
+import type { PortfolioStrategy, PortfolioConfig } from "../portfolio/mod.ts";
+import type { TradingStrategy, TradingConfig } from "../trading/mod.ts";
+import type { Kline } from "../kucoin/mod.ts";
 import type { PositionState, PortfolioDecision, SwapPlan } from "./types.ts";
-import type { CoinCandidate } from "../roles/types.ts";
+import type { CoinCandidate } from "../discovery/mod.ts";
 
 class AlwaysBuyPortfolio implements PortfolioStrategy {
   readonly name = "always-buy";

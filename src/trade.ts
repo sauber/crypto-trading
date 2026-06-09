@@ -1,18 +1,20 @@
-import { KucoinClient } from "./kucoin/client.ts";
+import { KucoinClient } from "./kucoin/mod.ts";
 import { TradingEngine } from "./engine/live.ts";
 import type { LiveEngineConfig } from "./engine/live.ts";
+import { KucoinPositionLoader } from "./position/mod.ts";
+import { BlankPositionLoader } from "./position/mod.ts";
 import {
   discoveryRegistry,
-} from "./roles/registration.ts";
-import { ROLE_CONFIG } from "./roles/config.ts";
-import type { KucoinConfig } from "./kucoin/types.ts";
+} from "./registry/registration.ts";
+import { ROLE_CONFIG } from "./config.ts";
+import type { KucoinConfig } from "./kucoin/mod.ts";
 import {
   portfolioRegistry,
   tradingRegistry,
   executionRegistry,
   commRegistry,
   reflectionRegistry,
-} from "./roles/registration.ts";
+} from "./registry/registration.ts";
 
 const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";
 const KUCOIN_API_SECRET = Deno.env.get("KUCOIN_API_SECRET") || "";
@@ -55,6 +57,21 @@ const reflection = reflectionRegistry
   .get(ROLE_CONFIG.reflection.strategy)
   .create();
 
+const positionLoader = DRY_RUN
+  ? new BlankPositionLoader({
+    reserveSymbol: ROLE_CONFIG.reserveSymbol,
+    candleInterval: ROLE_CONFIG.candleInterval,
+    candleRangeMs: ROLE_CONFIG.candleRangeMs,
+  })
+  : new KucoinPositionLoader(
+    {
+      reserveSymbol: ROLE_CONFIG.reserveSymbol,
+      candleInterval: ROLE_CONFIG.candleInterval,
+      candleRangeMs: ROLE_CONFIG.candleRangeMs,
+    },
+    client,
+  );
+
 const engineConfig: LiveEngineConfig = {
   client,
   discovery,
@@ -63,6 +80,7 @@ const engineConfig: LiveEngineConfig = {
   execution,
   communication: comm,
   reflection,
+  positionLoader,
   intervalMs: ROLE_CONFIG.cycleIntervalMs,
   targetPositions: ROLE_CONFIG.targetPositions,
   candleInterval: ROLE_CONFIG.candleInterval,

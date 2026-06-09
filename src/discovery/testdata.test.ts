@@ -1,5 +1,5 @@
 import { FileDiscovery } from "./testdata.ts";
-import type { Kline } from "../kucoin/types.ts";
+import type { Kline } from "../kucoin/mod.ts";
 
 function k(close: number, volume: number): Kline {
   return { timestamp: 1, open: close, high: close + 1, low: close - 1, close, volume };
