@@ -1,4 +1,6 @@
 import { pipelineSimulate } from "./engine/simulate.ts";
+import { FileDiscovery } from "./discovery/testdata.ts";
+import { config as fileDiscCfg } from "./discovery/testdata.config.ts";
 import { RankTrendPortfolio } from "./roles/portfolio/strategies/rank-trend/strategy.ts";
 import { config as rankTrendCfg } from "./roles/portfolio/strategies/rank-trend/config.ts";
 import { RsiTimedTrading } from "./roles/trading/strategies/rsi-timed/strategy.ts";
@@ -71,10 +73,12 @@ console.log(`Trading:   ${args.trading}\n`);
 
 const data = await loadData();
 
+const discoveryStrategy = new FileDiscovery(fileDiscCfg);
 const portfolioStrategy = createPortfolioStrategy(args.portfolio);
 const tradingStrategy = createTradingStrategy(args.trading);
 
 const result = await pipelineSimulate({
+  discoveryStrategy,
   portfolioStrategy,
   tradingStrategy,
   klines: data.klines,
@@ -82,7 +86,7 @@ const result = await pipelineSimulate({
   interval: data.interval,
   config: {
     initialCapital: 1000,
-    maxPositions: 5,
+    targetPositions: 5,
     fee: 0.001,
   },
 });
@@ -95,3 +99,34 @@ console.log(`Win Rate:      ${result.winRate.toFixed(1)}%`);
 console.log(`Profit Factor: ${result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)}`);
 console.log(`Total Trades:  ${result.totalTrades}`);
 console.log(`Equity Curve:  ${result.equityCurve.length} punkter`);
+
+if (result.trades.length > 0) {
+  console.log(`\n=== Transaktioner (${result.trades.length}) ===`);
+  const wins = result.trades.filter((t) => t.pnlPct > 0).length;
+  const losses = result.trades.filter((t) => t.pnlPct <= 0).length;
+  console.log(`W/L: ${wins}/${losses}\n`);
+
+  const header = `${"#".padEnd(4)} ${"Sælg".padEnd(14)} → ${"Køb".padEnd(14)} ${"P/L %".padEnd(9)} ${"Bars".padEnd(5)} Årsag`;
+  console.log(header);
+  console.log("-".repeat(header.length));
+
+  for (let i = 0; i < result.trades.length; i++) {
+    const t = result.trades[i];
+    const pnl = t.pnlPct > 0 ? `+${t.pnlPct.toFixed(2)}` : t.pnlPct.toFixed(2);
+    console.log(
+      `${(i + 1).toString().padEnd(4)} ${t.sellSymbol.padEnd(14)} → ${t.buySymbol.padEnd(14)} ${pnl.padEnd(9)} ${t.bars.toString().padEnd(5)} ${t.reason}`,
+    );
+  }
+
+  console.log(`\nTop 5 vindere:`);
+  const topWins = [...result.trades].sort((a, b) => b.pnlPct - a.pnlPct).slice(0, 5);
+  for (const t of topWins) {
+    console.log(`  +${t.pnlPct.toFixed(2)}% ${t.sellSymbol} → ${t.buySymbol} (${t.reason})`);
+  }
+
+  console.log(`\nTop 5 tabere:`);
+  const topLosses = [...result.trades].sort((a, b) => a.pnlPct - b.pnlPct).slice(0, 5);
+  for (const t of topLosses) {
+    console.log(`  ${t.pnlPct.toFixed(2)}% ${t.sellSymbol} → ${t.buySymbol} (${t.reason})`);
+  }
+}

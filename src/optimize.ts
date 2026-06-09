@@ -1,6 +1,8 @@
 import type { Kline } from "./kucoin/types.ts";
 import { pipelineSimulate } from "./engine/simulate.ts";
 import type { SimConfig } from "./engine/simulate.ts";
+import { FileDiscovery } from "./discovery/testdata.ts";
+import { config as fileDiscCfg } from "./discovery/testdata.config.ts";
 import { ROLE_CONFIG } from "./roles/config.ts";
 import {
   portfolioRegistry,
@@ -42,7 +44,7 @@ interface ParamSpec {
 
 const portfolioParamSpecs: Record<string, ParamSpec[]> = {
   "rank-trend": [
-    { key: "maxPositions", lo: 2, hi: 10, int: true },
+    { key: "targetPositions", lo: 2, hi: 10, int: true },
   ],
 };
 
@@ -185,14 +187,16 @@ async function evaluate(
     .get(tradingName)
     .create(tradingCfg);
 
+  const discoveryStrategy = new FileDiscovery(fileDiscCfg);
   const coinsArr = [...klines.keys()];
   const sc: SimConfig = {
     initialCapital: 10000,
-    maxPositions: (portfolioCfg.maxPositions as number) ?? 5,
+    targetPositions: (portfolioCfg.targetPositions as number) ?? 5,
     fee: 0.001,
   };
 
   const result = await pipelineSimulate({
+    discoveryStrategy,
     portfolioStrategy,
     tradingStrategy,
     klines,
@@ -279,13 +283,15 @@ if (bestParams) {
     .get(tradingName)
     .create(tradingCfg);
 
+  const bestDiscovery = new FileDiscovery(fileDiscCfg);
   const sc: SimConfig = {
     initialCapital: 10000,
-    maxPositions: (portfolioCfg.maxPositions as number) ?? 5,
+    targetPositions: (portfolioCfg.targetPositions as number) ?? 5,
     fee: 0.001,
   };
 
   const result = await pipelineSimulate({
+    discoveryStrategy: bestDiscovery,
     portfolioStrategy: bestPortfolio,
     tradingStrategy: bestTrading,
     klines: klineMap,

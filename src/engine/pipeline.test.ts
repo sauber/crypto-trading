@@ -1,4 +1,6 @@
 import { pipelineSimulate } from "./simulate.ts";
+import { FileDiscovery } from "../discovery/testdata.ts";
+import { config as fileDiscCfg } from "../discovery/testdata.config.ts";
 import { RankTrendPortfolio } from "../roles/portfolio/strategies/rank-trend/strategy.ts";
 import { config as rankTrendCfg } from "../roles/portfolio/strategies/rank-trend/config.ts";
 import { RsiTimedTrading } from "../roles/trading/strategies/rsi-timed/strategy.ts";
@@ -38,12 +40,13 @@ Deno.test("pipeline with rank-trend + rsi-timed produces valid results", async (
   }
 
   const result = await pipelineSimulate({
+    discoveryStrategy: new FileDiscovery(fileDiscCfg),
     portfolioStrategy: new RankTrendPortfolio(rankTrendCfg),
     tradingStrategy: new RsiTimedTrading(rsiTimedCfg),
     klines,
     coins,
     interval: "1hour",
-    config: { initialCapital: 1000, maxPositions: 5, fee: 0.001 },
+    config: { initialCapital: 1000, targetPositions: 5, fee: 0.001 },
   });
 
   if (result.equityCurve.length !== 200 - 50 + 2) {
@@ -93,12 +96,13 @@ Deno.test("pipeline with rank-trend buys improving-rank coins", async () => {
   klines.set("ETH-USDT", ethKlines);
 
   const result = await pipelineSimulate({
+    discoveryStrategy: new FileDiscovery(fileDiscCfg),
     portfolioStrategy: new RankTrendPortfolio(rankTrendCfg),
     tradingStrategy: new RsiTimedTrading(rsiTimedCfg),
     klines,
     coins,
     interval: "1hour",
-    config: { initialCapital: 1000, maxPositions: 5, fee: 0.001 },
+    config: { initialCapital: 1000, targetPositions: 5, fee: 0.001 },
   });
 
   if (result.totalTrades < 0) {

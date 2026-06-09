@@ -2,7 +2,7 @@ import type { ExecutionStrategy, ExecutionConfig } from "../types.ts";
 import type { PositionState, Swap, ExecutionResult, TradeRecord } from "../../../engine/types.ts";
 import type { Kline } from "../../../kucoin/types.ts";
 
-export const config: ExecutionConfig = { fee: 0.001, maxPositions: 5 };
+export const config: ExecutionConfig = { fee: 0.001, targetPositions: 5 };
 
 export class SimulateExecution implements ExecutionStrategy {
   readonly name = "simulate";
@@ -75,8 +75,8 @@ export class SimulateExecution implements ExecutionStrategy {
       if (swap.buySymbol) {
         const buyPrice = this.prices.get(swap.buySymbol) || 0;
         if (buyPrice > 0) {
-          const maxPositions = this.config.maxPositions ?? 5;
-          const slotsLeft = maxPositions - 1 - newPositions.size;
+          const tgtPositions = this.config.targetPositions ?? 5;
+          const slotsLeft = tgtPositions - newPositions.size;
           const spend = proceeds > 0
             ? proceeds
             : capital / Math.max(1, slotsLeft);

@@ -1,7 +1,9 @@
 import { KucoinClient } from "./kucoin/client.ts";
 import { TradingEngine } from "./engine/live.ts";
 import type { LiveEngineConfig } from "./engine/live.ts";
-import { TopVolumeDiscovery } from "./roles/discovery/strategy.ts";
+import {
+  discoveryRegistry,
+} from "./roles/registration.ts";
 import { ROLE_CONFIG } from "./roles/config.ts";
 import type { KucoinConfig } from "./kucoin/types.ts";
 import {
@@ -28,7 +30,9 @@ const client = new KucoinClient({
   apiPassphrase: KUCOIN_API_PASSPHRASE,
 } as KucoinConfig);
 
-const discovery = new TopVolumeDiscovery();
+const discovery = discoveryRegistry
+  .get(ROLE_CONFIG.discovery.strategy)
+  .create(ROLE_CONFIG.discovery.params, client);
 
 const portfolio = portfolioRegistry
   .get(ROLE_CONFIG.portfolio.strategy)
@@ -60,13 +64,14 @@ const engineConfig: LiveEngineConfig = {
   communication: comm,
   reflection,
   intervalMs: ROLE_CONFIG.cycleIntervalMs,
-  maxPositions: ROLE_CONFIG.maxPositions,
+  targetPositions: ROLE_CONFIG.targetPositions,
   candleInterval: ROLE_CONFIG.candleInterval,
   candleRangeMs: ROLE_CONFIG.candleRangeMs,
   reserveSymbol: ROLE_CONFIG.reserveSymbol,
 };
 
 console.log(`DRY_RUN=${DRY_RUN}`);
+console.log(`discovery=${ROLE_CONFIG.discovery.strategy}`);
 console.log(`portfolio=${ROLE_CONFIG.portfolio.strategy}`);
 console.log(`trading=${ROLE_CONFIG.trading.strategy}`);
 console.log(`execution=${DRY_RUN ? "simulate" : "kucoin"}`);

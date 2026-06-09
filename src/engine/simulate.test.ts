@@ -1,4 +1,5 @@
 import { pipelineSimulate } from "./simulate.ts";
+import { FileDiscovery } from "../discovery/testdata.ts";
 import type { PortfolioStrategy, PortfolioConfig } from "../roles/portfolio/types.ts";
 import type { TradingStrategy, TradingConfig } from "../roles/trading/types.ts";
 import type { Kline } from "../kucoin/types.ts";
@@ -7,7 +8,7 @@ import type { CoinCandidate } from "../roles/types.ts";
 
 class AlwaysBuyPortfolio implements PortfolioStrategy {
   readonly name = "always-buy";
-  readonly config: PortfolioConfig = { maxPositions: 5, allocationMethod: "equal" };
+  readonly config: PortfolioConfig = { targetPositions: 5, allocationMethod: "equal" };
 
   async analyze(
     params: {
@@ -32,7 +33,7 @@ class AlwaysBuyPortfolio implements PortfolioStrategy {
 
 class RotatePortfolio implements PortfolioStrategy {
   readonly name = "rotate";
-  readonly config: PortfolioConfig = { maxPositions: 5, allocationMethod: "equal" };
+  readonly config: PortfolioConfig = { targetPositions: 5, allocationMethod: "equal" };
   private bar = 0;
 
   async analyze(
@@ -86,12 +87,11 @@ class FirstCoinTrading implements TradingStrategy {
       activePositions: PositionState[];
       prices: Map<string, number>;
       klines: Map<string, Kline[]>;
-      maxPositions: number;
+      targetPositions: number;
     },
   ): Promise<SwapPlan> {
-    const maxSlots = params.maxPositions - 1;
     const activeCount = params.activePositions.length;
-    const slotsLeft = maxSlots - activeCount;
+    const slotsLeft = params.targetPositions - activeCount;
 
     const swaps = params.wantToBuy.slice(0, slotsLeft).map((buy) => ({
       sellSymbol: "",
@@ -119,7 +119,7 @@ class RotateTrading implements TradingStrategy {
       activePositions: PositionState[];
       prices: Map<string, number>;
       klines: Map<string, Kline[]>;
-      maxPositions: number;
+      targetPositions: number;
     },
   ): Promise<SwapPlan> {
     const swaps: Array<{ sellSymbol: string; buySymbol: string; reason: string }> = [];
@@ -167,12 +167,13 @@ Deno.test("pipelineSimulate returns correct PipelineResult structure", async () 
   for (const coin of coins) klines.set(coin, makeKlines(100));
 
   const result = await pipelineSimulate({
+    discoveryStrategy: new FileDiscovery({ topN: coins.length }),
     portfolioStrategy: new AlwaysBuyPortfolio(),
     tradingStrategy: new FirstCoinTrading(),
     klines,
     coins,
     interval: "1hour",
-    config: { initialCapital: 1000, maxPositions: 3, fee: 0.001 },
+    config: { initialCapital: 1000, targetPositions: 3, fee: 0.001 },
   });
 
   if (result.trades.length !== result.totalTrades) {
@@ -204,12 +205,13 @@ Deno.test("pipelineSimulate with insufficient data throws", async () => {
   let threw = false;
   try {
     await pipelineSimulate({
+      discoveryStrategy: new FileDiscovery({ topN: coins.length }),
       portfolioStrategy: new AlwaysBuyPortfolio(),
       tradingStrategy: new FirstCoinTrading(),
       klines,
       coins,
       interval: "1hour",
-      config: { initialCapital: 1000, maxPositions: 3, fee: 0.001 },
+      config: { initialCapital: 1000, targetPositions: 3, fee: 0.001 },
     });
   } catch {
     threw = true;
@@ -217,18 +219,19 @@ Deno.test("pipelineSimulate with insufficient data throws", async () => {
   if (!threw) throw new Error("Expected error with insufficient data");
 });
 
-Deno.test("pipelineSimulate with multiple coins respects maxPositions limit", async () => {
+Deno.test("pipelineSimulate with multiple coins respects targetPositions limit", async () => {
   const coins = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "ADA-USDT", "DOT-USDT"];
   const klines = new Map<string, Kline[]>();
   for (const coin of coins) klines.set(coin, makeKlines(100));
 
   const result = await pipelineSimulate({
+    discoveryStrategy: new FileDiscovery({ topN: coins.length }),
     portfolioStrategy: new AlwaysBuyPortfolio(),
     tradingStrategy: new FirstCoinTrading(),
     klines,
     coins,
     interval: "1hour",
-    config: { initialCapital: 1000, maxPositions: 3, fee: 0.001 },
+    config: { initialCapital: 1000, targetPositions: 3, fee: 0.001 },
   });
 
   if (result.equityCurve[result.equityCurve.length - 1] <= 0) {
@@ -243,12 +246,13 @@ Deno.test("pipelineSimulate records trades when positions are sold", async () =>
   for (const coin of coins) klines.set(coin, makeKlines(200, 100, 0.3));
 
   const result = await pipelineSimulate({
+    discoveryStrategy: new FileDiscovery({ topN: coins.length }),
     portfolioStrategy: new RotatePortfolio(),
     tradingStrategy: new RotateTrading(),
     klines,
     coins,
     interval: "1hour",
-    config: { initialCapital: 1000, maxPositions: 3, fee: 0.001 },
+    config: { initialCapital: 1000, targetPositions: 3, fee: 0.001 },
   });
 
   if (result.totalTrades <= 0) {

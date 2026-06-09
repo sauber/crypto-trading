@@ -3,7 +3,7 @@ import type { CoinCandidate } from "../types.ts";
 import type { KucoinClient } from "../../kucoin/client.ts";
 
 export interface PortfolioConfig {
-  maxPositions: number;
+  targetPositions: number;
   allocationMethod: "equal" | "weighted";
 }
 

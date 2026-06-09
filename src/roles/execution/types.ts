@@ -2,7 +2,7 @@ import type { PositionState, Swap, ExecutionResult } from "../../engine/types.ts
 
 export interface ExecutionConfig {
   fee: number;
-  maxPositions?: number;
+  targetPositions?: number;
 }
 
 export interface ExecutionStrategy {

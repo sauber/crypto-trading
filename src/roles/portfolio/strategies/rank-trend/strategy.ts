@@ -49,7 +49,7 @@ export class RankTrendPortfolio implements PortfolioStrategy {
     const wantToBuy = scored
       .filter((s) => s.rankChange > 0 && !held.has(s.symbol))
       .sort((a, b) => b.rankChange - a.rankChange)
-      .slice(0, this.config.maxPositions)
+      .slice(0, this.config.targetPositions)
       .map((s) => ({
         symbol: s.symbol,
         confidence: Math.min(s.rankChange * 20, 100),

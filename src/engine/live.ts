@@ -3,11 +3,10 @@ import type { TradingStrategy } from "../roles/trading/types.ts";
 import type { ExecutionStrategy } from "../roles/execution/types.ts";
 import type { CommunicationStrategy } from "../roles/communication/types.ts";
 import type { ReflectionStrategy } from "../roles/reflection/types.ts";
-import type { DiscoveryStrategy } from "../roles/types.ts";
+import type { DiscoveryStrategy } from "../discovery/types.ts";
 import { KucoinClient } from "../kucoin/client.ts";
 import type { Kline } from "../kucoin/types.ts";
 import type { PositionState, PortfolioDecision, PipelineResult, TradeRecord } from "./types.ts";
-import type { CoinCandidate } from "../roles/types.ts";
 
 export interface LiveEngineConfig {
   client: KucoinClient;
@@ -18,7 +17,7 @@ export interface LiveEngineConfig {
   communication: CommunicationStrategy;
   reflection: ReflectionStrategy;
   intervalMs: number;
-  maxPositions: number;
+  targetPositions: number;
   candleInterval: string;
   candleRangeMs: number;
   reserveSymbol: string;
@@ -28,6 +27,7 @@ export class TradingEngine {
   private config: LiveEngineConfig;
   private running = false;
   private cycleCount = 0;
+  private initialPositions: PositionState[] = [];
 
   constructor(config: LiveEngineConfig) {
     this.config = config;
@@ -45,6 +45,8 @@ export class TradingEngine {
     console.log(`Communication: ${this.config.communication.name}`);
     console.log(`Reflection:   ${this.config.reflection.name}`);
     console.log(`Interval:     ${this.config.intervalMs / 60000} min\n`);
+
+    await this.loadInitialPositions();
 
     this.installShutdown();
 
@@ -76,14 +78,76 @@ export class TradingEngine {
     try { Deno.addSignalListener("SIGBREAK", shutdown); } catch {}
   }
 
+  private async loadInitialPositions(): Promise<void> {
+    const { client, reserveSymbol, candleInterval, candleRangeMs } = this.config;
+
+    console.log("=== Initialiserer portefølje ===");
+    const balances = await client.getBalances();
+    const activeBalances = balances.filter(
+      (b) => parseFloat(b.available) > 0 && b.currency !== reserveSymbol,
+    );
+
+    if (activeBalances.length === 0) {
+      console.log("Ingen eksisterende positioner fundet.\n");
+      return;
+    }
+
+    const now = Date.now();
+
+    for (const b of activeBalances) {
+      const symbol = `${b.currency}-USDT`;
+      try {
+        const ticker = await client.getTicker(symbol);
+        const price = ticker.last;
+        const size = parseFloat(b.available);
+        const value = size * price;
+        this.initialPositions.push({
+          symbol,
+          entryPrice: price,
+          size,
+          enteredAt: now - candleRangeMs,
+          entryValue: value,
+        });
+        console.log(
+          `  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`,
+        );
+      } catch {
+        try {
+          const klines = await client.getKlines(symbol, candleInterval, now - candleRangeMs, now);
+          if (klines.length > 0) {
+            const price = klines[klines.length - 1].close;
+            const size = parseFloat(b.available);
+            const value = size * price;
+            this.initialPositions.push({
+              symbol,
+              entryPrice: price,
+              size,
+              enteredAt: now - candleRangeMs,
+              entryValue: value,
+            });
+            console.log(
+              `  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`,
+            );
+          }
+        } catch {
+          const size = parseFloat(b.available);
+          console.log(`  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} (kunne ikke hente pris)`);
+        }
+      }
+    }
+
+    console.log(`\nTotal ${this.initialPositions.length} positioner, ` +
+      `$ ${this.initialPositions.reduce((s, p) => s + p.entryValue, 0).toFixed(2)}\n`);
+  }
+
   private async cycle(): Promise<void> {
     this.cycleCount++;
-    const { client, discovery, portfolio, trading, execution, communication, reflection, maxPositions, candleInterval, candleRangeMs, reserveSymbol } = this.config;
+    const { client, discovery, portfolio, trading, execution, communication, reflection, targetPositions, candleInterval, candleRangeMs, reserveSymbol } = this.config;
 
     console.log(`\n=== Cycle ${this.cycleCount} ===`);
 
     // 1. Discovery — find top coins
-    const candidates = await discovery.discover(client);
+    const candidates = await discovery.discover();
     if (candidates.length === 0) {
       console.log("Ingen coins fundet.");
       return;
@@ -96,7 +160,11 @@ export class TradingEngine {
     const klines = new Map<string, Kline[]>();
     const prices = new Map<string, number>();
 
-    for (const sym of symbols) {
+    // Include all candidate symbols + any held symbols not in candidates
+    const heldSymbols = this.initialPositions.map((p) => p.symbol);
+    const allSymbols = [...new Set([...symbols, ...heldSymbols])];
+
+    for (const sym of allSymbols) {
       try {
         const k = await client.getKlines(sym, candleInterval, now - candleRangeMs, now);
         klines.set(sym, k);
@@ -109,21 +177,38 @@ export class TradingEngine {
     // 3. Fetch current balances/positions
     const balances = await client.getBalances();
     const activePositions: PositionState[] = [];
+
     for (const b of balances) {
       const av = parseFloat(b.available);
       if (av > 0 && b.currency !== reserveSymbol) {
         const symbol = `${b.currency}-USDT`;
-        const price = prices.get(symbol) || 0;
-        activePositions.push({
-          symbol,
-          entryPrice: price,
-          size: av,
-          enteredAt: now,
-          entryValue: av * price,
-        });
+        const price = prices.get(symbol);
+        if (price && price > 0) {
+          activePositions.push({
+            symbol,
+            entryPrice: price,
+            size: av,
+            enteredAt: now,
+            entryValue: av * price,
+          });
+        }
       }
     }
-    console.log(`Positioner: ${activePositions.length}`);
+
+    console.log(`\n  ── Portfolio ──`);
+    if (activePositions.length === 0) {
+      console.log(`     (ingen positioner)`);
+    } else {
+      let totalValue = 0;
+      for (const p of activePositions) {
+        const price = prices.get(p.symbol) ?? 0;
+        const value = p.size * price;
+        totalValue += value;
+        console.log(`     ${p.symbol.padEnd(12)} ${p.size.toFixed(4).padStart(10)} @ $${price.toFixed(4).padStart(10)} = $${value.toFixed(2)}`);
+      }
+      console.log(`     ─────────────────────────────────────────────`);
+      console.log(`     Total: $${totalValue.toFixed(2)}`);
+    }
 
     // 4. Portfolio analysis
     const decision = await portfolio.analyze({
@@ -134,7 +219,18 @@ export class TradingEngine {
       interval: candleInterval,
       candleRangeMs,
     });
-    console.log(`Portfolio: ${decision.wantToBuy.length} ønsker at købe, ${decision.wantToSell.length} ønsker at sælge`);
+
+    console.log(`\n  ── Portfolio beslutning ──`);
+    console.log(`     Ønsker at købe (${decision.wantToBuy.length}):`);
+    for (const b of decision.wantToBuy) {
+      console.log(`       + ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`);
+    }
+    if (decision.wantToBuy.length === 0) console.log(`       (ingen)`);
+    console.log(`     Ønsker at sælge (${decision.wantToSell.length}):`);
+    for (const s of decision.wantToSell) {
+      console.log(`       - ${s.symbol.padEnd(12)} ${s.reason}`);
+    }
+    if (decision.wantToSell.length === 0) console.log(`       (ingen)`);
 
     // 5. Trading plan
     const plan = await trading.plan({
@@ -143,9 +239,31 @@ export class TradingEngine {
       activePositions,
       prices,
       klines,
-      maxPositions,
+      targetPositions,
     });
-    console.log(`Trading: ${plan.swaps.length} swaps planlagt`);
+
+    console.log(`\n  ── Execution ──`);
+    if (plan.swaps.length === 0) {
+      console.log(`     (ingen swaps denne cycle)`);
+    }
+    for (const swap of plan.swaps) {
+      if (swap.sellSymbol) {
+        const price = prices.get(swap.sellSymbol) ?? 0;
+        const pos = activePositions.find((p) => p.symbol === swap.sellSymbol);
+        const size = pos?.size ?? 0;
+        const gross = size * price;
+        const net = gross * (1 - 0.001);
+        console.log(`     Salg ${swap.sellSymbol.padEnd(12)} ${size.toFixed(4)} coins @ $${price.toFixed(4)} = $${gross.toFixed(2)} → $${net.toFixed(2)} modtaget`);
+        console.log(`       Årsag: ${swap.reason}`);
+      }
+      if (swap.buySymbol) {
+        const price = prices.get(swap.buySymbol) ?? 0;
+        const slotsLeft = targetPositions - activePositions.length;
+        const spendEstimate = plan.swaps.length > 1 ? 100 : 50;
+        console.log(`     Køb  ${swap.buySymbol.padEnd(12)} ~$${spendEstimate.toFixed(2)} @ $${price.toFixed(4)} = ~${(spendEstimate / price).toFixed(4)} coins`);
+        console.log(`       Årsag: ${swap.reason}`);
+      }
+    }
 
     // 6. Record preconditions
     reflection.recordPrecondition({
@@ -166,7 +284,7 @@ export class TradingEngine {
     // 9. Reflect
     const insights = reflection.reflect();
     for (const insight of insights) {
-      console.log(`[${insight.type}] ${insight.message}`);
+      console.log(`  [${insight.type}] ${insight.message}`);
     }
 
     // 10. Build pipeline result for reporting

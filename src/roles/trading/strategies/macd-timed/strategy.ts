@@ -17,7 +17,7 @@ export class MacdTimedTrading implements TradingStrategy {
     activePositions: PositionState[];
     prices: Map<string, number>;
     klines: Map<string, Kline[]>;
-    maxPositions: number;
+    targetPositions: number;
   }): Promise<SwapPlan> {
     const swaps: Array<{ sellSymbol: string; buySymbol: string; reason: string }> = [];
     const fp = this.config.fastPeriod ?? 12;
@@ -46,8 +46,7 @@ export class MacdTimedTrading implements TradingStrategy {
     }
 
     const held = new Set(params.activePositions.map((p) => p.symbol));
-    const maxSlots = params.maxPositions - 1;
-    const slotsLeft = maxSlots - held.size + params.wantToSell.length;
+    const slotsLeft = params.targetPositions - held.size + params.wantToSell.length;
 
     let buysAdded = 0;
     for (const buy of params.wantToBuy) {

@@ -12,6 +12,6 @@ export interface TradingStrategy {
     activePositions: PositionState[];
     prices: Map<string, number>;
     klines: Map<string, Kline[]>;
-    maxPositions: number;
+    targetPositions: number;
   }): Promise<SwapPlan>;
 }

@@ -4,7 +4,11 @@ import type { TradingStrategy } from "./trading/types.ts";
 import type { ExecutionStrategy } from "./execution/types.ts";
 import type { CommunicationStrategy } from "./communication/types.ts";
 import type { ReflectionStrategy } from "./reflection/types.ts";
+import type { DiscoveryStrategy, DiscoveryConfig } from "../discovery/types.ts";
+import type { KucoinClient } from "../kucoin/client.ts";
 import type { Kline } from "../kucoin/types.ts";
+import { FileDiscovery } from "../discovery/testdata.ts";
+import { KucoinDiscovery } from "../discovery/kucoin.ts";
 import { RankTrendPortfolio } from "./portfolio/strategies/rank-trend/strategy.ts";
 import { RsiTimedTrading } from "./trading/strategies/rsi-timed/strategy.ts";
 import { MacdTimedTrading } from "./trading/strategies/macd-timed/strategy.ts";
@@ -16,6 +20,14 @@ import { SilentComm } from "./communication/strategies/silent.ts";
 import { VerboseComm } from "./communication/strategies/verbose.ts";
 import { NoopReflection } from "./reflection/strategies/noop.ts";
 import { AnalystReflection } from "./reflection/strategies/analyst.ts";
+
+export const discoveryRegistry = new RoleRegistry<DiscoveryStrategy>();
+
+discoveryRegistry.register("testdata", (config?: unknown) =>
+  new FileDiscovery(config as DiscoveryConfig));
+
+discoveryRegistry.register("kucoin", (...args: unknown[]) =>
+  new KucoinDiscovery(args[0] as DiscoveryConfig, args[1] as KucoinClient));
 
 export const portfolioRegistry = new RoleRegistry<PortfolioStrategy>();
 export const tradingRegistry = new RoleRegistry<TradingStrategy>();

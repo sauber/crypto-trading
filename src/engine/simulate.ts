@@ -1,17 +1,19 @@
 import type { PortfolioStrategy } from "../roles/portfolio/types.ts";
 import type { TradingStrategy } from "../roles/trading/types.ts";
+import type { DiscoveryStrategy } from "../discovery/types.ts";
 import type { Kline } from "../kucoin/types.ts";
 import type { PositionState, PipelineResult, TradeRecord } from "./types.ts";
-import type { CoinCandidate } from "../roles/types.ts";
 
 export interface SimConfig {
   initialCapital: number;
-  maxPositions: number;
+  targetPositions: number;
   fee: number;
   startBar?: number;
+  verbose?: boolean;
 }
 
 export interface SimParams {
+  discoveryStrategy: DiscoveryStrategy;
   portfolioStrategy: PortfolioStrategy;
   tradingStrategy: TradingStrategy;
   klines: Map<string, Kline[]>;
@@ -21,8 +23,8 @@ export interface SimParams {
 }
 
 export async function pipelineSimulate(params: SimParams): Promise<PipelineResult> {
-  const { portfolioStrategy, tradingStrategy, klines, coins, interval, config } = params;
-  const { initialCapital, maxPositions, fee } = config;
+  const { discoveryStrategy, portfolioStrategy, tradingStrategy, klines, coins, interval, config } = params;
+  const { initialCapital, targetPositions, fee } = config;
   const startBar = config.startBar ?? 50;
 
   const barCounts = coins.map((c) => (klines.get(c) || []).length);
@@ -37,6 +39,16 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
   const equityCurve: number[] = [initialCapital];
   let peak = initialCapital;
   let maxDD = 0;
+  const verbose = config.verbose ?? true;
+
+  const barTime = (b: number): string =>
+    new Date((klines.get(coins[0]) || [])[b]?.timestamp ?? 0).toISOString().slice(0, 16).replace("T", " ");
+
+  const fmtPositions = (pos: Map<string, PositionState>, p: Map<string, number>): string[] =>
+    [...pos.values()].map((po) => {
+      const pr = p.get(po.symbol) ?? 0;
+      return `${po.symbol.padEnd(12)} ${po.size.toFixed(4).padStart(10)} @ $${pr.toFixed(4).padStart(10)} = $${(po.size * pr).toFixed(2)}`;
+    });
 
   for (let bar = startBar; bar < minBars; bar++) {
     const prices = new Map<string, number>();
@@ -45,15 +57,7 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
       if (k && k.length > bar) prices.set(coin, k[bar].close);
     }
 
-    const candidates: CoinCandidate[] = coins.map((c) => {
-      const k = klines.get(c);
-      const lastKline = k?.[bar];
-      return {
-        symbol: c,
-        score: lastKline?.volume ?? 0,
-        reason: "simulation",
-      };
-    });
+    const candidates = await discoveryStrategy.discover({ klines, barIndex: bar });
 
     const activePositions = [...positions.values()];
 
@@ -88,8 +92,43 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
       activePositions,
       prices,
       klines: klinesUpToBar,
-      maxPositions,
+      targetPositions,
     });
+
+    const hadTrades = plan.swaps.length > 0;
+
+    if (verbose && hadTrades) {
+      console.log(`\n── Cycle ${bar - startBar + 1} @ ${barTime(bar)} ──`);
+    }
+
+    if (verbose && hadTrades) {
+      const eq = equityCurve[equityCurve.length - 1];
+      console.log(`   Equity: $${eq.toFixed(2)} | Capital: $${capital.toFixed(2)}`);
+
+      // Portfolio: current positions
+      if (positions.size > 0) {
+        console.log(`   Portfolio (${positions.size}):`);
+        for (const line of fmtPositions(positions, prices)) {
+          console.log(`     ${line}`);
+        }
+      } else {
+        console.log(`   Portfolio: (tom)`);
+      }
+
+      // Trading: wanted / unwanted signals
+      if (decision.wantToBuy.length > 0) {
+        console.log(`   Ønsker at købe (${decision.wantToBuy.length}):`);
+        for (const b of decision.wantToBuy) {
+          console.log(`     ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`);
+        }
+      }
+      if (decision.wantToSell.length > 0) {
+        console.log(`   Ønsker at sælge (${decision.wantToSell.length}):`);
+        for (const s of decision.wantToSell) {
+          console.log(`     ${s.symbol.padEnd(12)} ${s.reason}`);
+        }
+      }
+    }
 
     for (const swap of plan.swaps) {
       let proceeds = 0;
@@ -98,7 +137,9 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
         const pos = positions.get(swap.sellSymbol)!;
         const sellPrice = prices.get(swap.sellSymbol) || 0;
         if (sellPrice > 0) {
-          proceeds = pos.size * sellPrice * (1 - fee);
+          const gross = pos.size * sellPrice;
+          proceeds = gross * (1 - fee);
+          const feeAmt = gross * fee;
           trades.push({
             entryTime: new Date(
               (klines.get(swap.sellSymbol) || [])[pos.enteredAt]?.timestamp ?? 0,
@@ -116,17 +157,21 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
           });
           capital += proceeds;
           positions.delete(swap.sellSymbol);
+          if (verbose && hadTrades) {
+            console.log(`   ─ Salg ${swap.sellSymbol}: ${pos.size.toFixed(4)} coins @ $${sellPrice.toFixed(4)} = $${gross.toFixed(2)} - fee $${feeAmt.toFixed(4)} → $${proceeds.toFixed(2)} modtaget`);
+          }
         }
       }
 
       if (swap.buySymbol) {
         const buyPrice = prices.get(swap.buySymbol) || 0;
         if (buyPrice > 0) {
-          const slotsLeft = maxPositions - 1 - positions.size;
+          const slotsLeft = targetPositions - positions.size;
           const spend = proceeds > 0
             ? proceeds
             : capital / Math.max(1, slotsLeft);
           const size = (spend / buyPrice) * (1 - fee);
+          const buyFee = size * buyPrice * fee;
           capital -= spend;
           positions.set(swap.buySymbol, {
             symbol: swap.buySymbol,
@@ -135,6 +180,9 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
             enteredAt: bar,
             entryValue: spend,
           });
+          if (verbose && hadTrades) {
+            console.log(`   ─ Køb  ${swap.buySymbol}: ${size.toFixed(4)} coins @ $${buyPrice.toFixed(4)} = $${spend.toFixed(2)} anvendt (fee $${buyFee.toFixed(4)})`);
+          }
         }
       }
     }
