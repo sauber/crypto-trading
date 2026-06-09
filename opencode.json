@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "trader": {
+      "description": "Helper agent til at udvikle og vedligeholde KuCoin trading agenten",
+      "mode": "subagent",
+      "permission": {
+        "read": "allow",
+        "edit": "allow",
+        "bash": "allow",
+        "glob": "allow",
+        "grep": "allow"
+      }
+    }
+  },
+  "customInstructions": "Se AGENTS.md for komplet arkitektur, roller, interfaces, og migrationsplan. Følg SOLID principper og TDD.",
+  "documentation": [
+    "AGENTS.md"
+  ]
+}

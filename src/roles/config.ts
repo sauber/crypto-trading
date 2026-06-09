@@ -1,0 +1,15 @@
+export const ROLE_CONFIG = {
+  discovery: { strategy: "top-volume" },
+  portfolio: { strategy: "rank-trend", params: { maxPositions: 5, allocationMethod: "equal" } },
+  trading: { strategy: "rsi-timed", params: { rsiPeriod: 14, rsiOversold: 30, rsiOverbought: 70, minConfidence: 50 } },
+  execution: { strategy: "simulate", params: { fee: 0.001 } },
+  communication: { strategy: "silent" },
+  reflection: { strategy: "noop" },
+  maxPositions: 5,
+  reserveSymbol: "USDC",
+  candleInterval: "1hour",
+  candleRangeMs: 55 * 3600000,
+  minCandles: 50,
+  cycleIntervalMs: 3600000,
+  topPairsLimit: 20,
+};
