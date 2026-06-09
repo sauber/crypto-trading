@@ -59,7 +59,7 @@ export class TradingEngine {
       }
       const elapsed = Date.now() - start;
       const wait = Math.max(60000, this.config.intervalMs - elapsed);
-      console.log(`\nVenter ${(wait / 60000).toFixed(0)} min...\n`);
+      console.log(`\nWaiting ${(wait / 60000).toFixed(0)} min...\n`);
       while (this.running && Date.now() - start < this.config.intervalMs) {
         await new Promise((r) => setTimeout(r, 1000));
       }
@@ -81,14 +81,14 @@ export class TradingEngine {
   private async loadInitialPositions(): Promise<void> {
     const { client, reserveSymbol, candleInterval, candleRangeMs } = this.config;
 
-    console.log("=== Initialiserer portefølje ===");
+    console.log("=== Initializing portfolio ===");
     const balances = await client.getBalances();
     const activeBalances = balances.filter(
       (b) => parseFloat(b.available) > 0 && b.currency !== reserveSymbol,
     );
 
     if (activeBalances.length === 0) {
-      console.log("Ingen eksisterende positioner fundet.\n");
+      console.log("No existing positions found.\n");
       return;
     }
 
@@ -131,12 +131,12 @@ export class TradingEngine {
           }
         } catch {
           const size = parseFloat(b.available);
-          console.log(`  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} (kunne ikke hente pris)`);
+          console.log(`  ${b.currency.padEnd(10)} ${size.toFixed(4).padStart(12)} (could not fetch price)`);
         }
       }
     }
 
-    console.log(`\nTotal ${this.initialPositions.length} positioner, ` +
+    console.log(`\nTotal ${this.initialPositions.length} positions, ` +
       `$ ${this.initialPositions.reduce((s, p) => s + p.entryValue, 0).toFixed(2)}\n`);
   }
 
@@ -149,11 +149,11 @@ export class TradingEngine {
     // 1. Discovery — find top coins
     const candidates = await discovery.discover();
     if (candidates.length === 0) {
-      console.log("Ingen coins fundet.");
+      console.log("No coins found.");
       return;
     }
     const symbols = candidates.map((c) => c.symbol);
-    console.log(`Fundet ${symbols.length} coins: ${symbols.slice(0, 5).join(", ")}...`);
+    console.log(`Found ${symbols.length} coins: ${symbols.slice(0, 5).join(", ")}...`);
 
     // 2. Fetch klines and prices
     const now = Date.now();
@@ -197,7 +197,7 @@ export class TradingEngine {
 
     console.log(`\n  ── Portfolio ──`);
     if (activePositions.length === 0) {
-      console.log(`     (ingen positioner)`);
+      console.log(`     (no positions)`);
     } else {
       let totalValue = 0;
       for (const p of activePositions) {
@@ -220,17 +220,17 @@ export class TradingEngine {
       candleRangeMs,
     });
 
-    console.log(`\n  ── Portfolio beslutning ──`);
-    console.log(`     Ønsker at købe (${decision.wantToBuy.length}):`);
+    console.log(`\n  ── Portfolio decision ──`);
+    console.log(`     Want to buy (${decision.wantToBuy.length}):`);
     for (const b of decision.wantToBuy) {
       console.log(`       + ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`);
     }
-    if (decision.wantToBuy.length === 0) console.log(`       (ingen)`);
-    console.log(`     Ønsker at sælge (${decision.wantToSell.length}):`);
+    if (decision.wantToBuy.length === 0) console.log(`       (none)`);
+    console.log(`     Want to sell (${decision.wantToSell.length}):`);
     for (const s of decision.wantToSell) {
       console.log(`       - ${s.symbol.padEnd(12)} ${s.reason}`);
     }
-    if (decision.wantToSell.length === 0) console.log(`       (ingen)`);
+    if (decision.wantToSell.length === 0) console.log(`       (none)`);
 
     // 5. Trading plan
     const plan = await trading.plan({
@@ -244,7 +244,7 @@ export class TradingEngine {
 
     console.log(`\n  ── Execution ──`);
     if (plan.swaps.length === 0) {
-      console.log(`     (ingen swaps denne cycle)`);
+      console.log(`     (no swaps this cycle)`);
     }
     for (const swap of plan.swaps) {
       if (swap.sellSymbol) {
@@ -253,15 +253,15 @@ export class TradingEngine {
         const size = pos?.size ?? 0;
         const gross = size * price;
         const net = gross * (1 - 0.001);
-        console.log(`     Salg ${swap.sellSymbol.padEnd(12)} ${size.toFixed(4)} coins @ $${price.toFixed(4)} = $${gross.toFixed(2)} → $${net.toFixed(2)} modtaget`);
-        console.log(`       Årsag: ${swap.reason}`);
+        console.log(`     Sell ${swap.sellSymbol.padEnd(12)} ${size.toFixed(4)} coins @ $${price.toFixed(4)} = $${gross.toFixed(2)} → $${net.toFixed(2)} received`);
+        console.log(`       Reason: ${swap.reason}`);
       }
       if (swap.buySymbol) {
         const price = prices.get(swap.buySymbol) ?? 0;
         const slotsLeft = targetPositions - activePositions.length;
         const spendEstimate = plan.swaps.length > 1 ? 100 : 50;
-        console.log(`     Køb  ${swap.buySymbol.padEnd(12)} ~$${spendEstimate.toFixed(2)} @ $${price.toFixed(4)} = ~${(spendEstimate / price).toFixed(4)} coins`);
-        console.log(`       Årsag: ${swap.reason}`);
+        console.log(`     Buy  ${swap.buySymbol.padEnd(12)} ~$${spendEstimate.toFixed(2)} @ $${price.toFixed(4)} = ~${(spendEstimate / price).toFixed(4)} coins`);
+        console.log(`       Reason: ${swap.reason}`);
       }
     }
 

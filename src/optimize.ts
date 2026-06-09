@@ -20,18 +20,18 @@ const TPE_CANDIDATES = 1000;
 const portfolioArg = Deno.args.find((a) => a.startsWith("--portfolio="));
 const tradingArg = Deno.args.find((a) => a.startsWith("--trading="));
 if (!portfolioArg || !tradingArg) {
-  console.error(`Brug: deno task optimize --portfolio=rank-trend --trading=rsi-timed`);
+  console.error(`Usage: deno task optimize --portfolio=rank-trend --trading=rsi-timed`);
   Deno.exit(1);
 }
 const portfolioName = portfolioArg.split("=")[1];
 const tradingName = tradingArg.split("=")[1];
 
 if (!portfolioRegistry.has(portfolioName)) {
-  console.error(`Ukendt portfolio: ${portfolioName}. Mulige: ${portfolioRegistry.list().join(", ")}`);
+  console.error(`Unknown portfolio: ${portfolioName}. Available: ${portfolioRegistry.list().join(", ")}`);
   Deno.exit(1);
 }
 if (!tradingRegistry.has(tradingName)) {
-  console.error(`Ukendt trading: ${tradingName}. Mulige: ${tradingRegistry.list().join(", ")}`);
+  console.error(`Unknown trading: ${tradingName}. Available: ${tradingRegistry.list().join(", ")}`);
   Deno.exit(1);
 }
 
@@ -219,11 +219,11 @@ for (const coin of coins) {
   klineMap.set(coin, (rawKlines[coin] || []) as Kline[]);
 }
 
-console.log(`=== BOHB Optimering ===`);
+console.log(`=== BOHB Optimization ===`);
 console.log(`Portfolio: ${portfolioName}`);
 console.log(`Trading:   ${tradingName}`);
 console.log(`Coins:     ${coins.length}`);
-console.log(`Parametre: ${nDims} (${allSpecs.map((s) => s.key).join(", ")})`);
+console.log(`Parameters: ${nDims} (${allSpecs.map((s) => s.key).join(", ")})`);
 console.log(`Etas: ${ETA}, Brackets: ${BRACKETS}, Init/configs: ${INITIAL_CONFIGS}\n`);
 
 const levels = [MIN_DAYS, MIN_DAYS * ETA, MAX_DAYS];
@@ -239,7 +239,7 @@ for (let bracket = 0; bracket < BRACKETS; bracket++) {
   for (let level = 0; level < levels.length; level++) {
     const days = levels[level];
     const nKeep = Math.max(1, Math.floor(candidates.length / ETA));
-    console.log(`  Level ${level + 1}: ${candidates.length} → ${nKeep} (${days} dage)`);
+    console.log(`  Level ${level + 1}: ${candidates.length} → ${nKeep} (${days} days)`);
     const results: { params: number[]; score: number }[] = [];
 
     for (const params of candidates) {
@@ -250,28 +250,28 @@ for (let bracket = 0; bracket < BRACKETS; bracket++) {
       if (score > bestScore) {
         bestScore = score;
         bestParams = params;
-        console.log(`  ✦ ny bedste: ${label(params)} score=${score.toFixed(2)}`);
+        console.log(`  ✦ new best: ${label(params)} score=${score.toFixed(2)}`);
       }
     }
 
     results.sort((a, b) => b.score - a.score);
     candidates = results.slice(0, nKeep).map((r) => r.params);
     if (level === levels.length - 1) {
-      console.log(`  → Vinder: ${label(candidates[0])} score=${results[0].score.toFixed(2)}`);
+      console.log(`  → Winner: ${label(candidates[0])} score=${results[0].score.toFixed(2)}`);
     }
   }
 }
 
 console.log(`\n=== BOHB Resultat ===`);
-console.log(`Totale evalueringer: ${totalEvals}\n`);
+console.log(`Total evaluations: ${totalEvals}\n`);
 if (bestParams) {
-  console.log(`Bedste parametre:`);
+  console.log(`Best parameters:`);
   for (let i = 0; i < nDims; i++) {
     console.log(`  ${allSpecs[i].key} = ${bestParams[i]}`);
   }
   console.log(`  score = ${bestScore.toFixed(2)}`);
 
-  console.log(`\n=== Verifikation på fuld data (60 dage) ===`);
+  console.log(`\n=== Verification on full data (60 days) ===`);
   const portfolioCfg = toPortfolioConfig(bestParams);
   const tradingCfg = toTradingConfig(bestParams);
 

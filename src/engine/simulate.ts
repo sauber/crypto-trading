@@ -112,18 +112,18 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
           console.log(`     ${line}`);
         }
       } else {
-        console.log(`   Portfolio: (tom)`);
+        console.log(`   Portfolio: (empty)`);
       }
 
       // Trading: wanted / unwanted signals
       if (decision.wantToBuy.length > 0) {
-        console.log(`   Ønsker at købe (${decision.wantToBuy.length}):`);
+        console.log(`   Want to buy (${decision.wantToBuy.length}):`);
         for (const b of decision.wantToBuy) {
           console.log(`     ${b.symbol.padEnd(12)} confidence=${b.confidence}  ${b.reason}`);
         }
       }
       if (decision.wantToSell.length > 0) {
-        console.log(`   Ønsker at sælge (${decision.wantToSell.length}):`);
+        console.log(`   Want to sell (${decision.wantToSell.length}):`);
         for (const s of decision.wantToSell) {
           console.log(`     ${s.symbol.padEnd(12)} ${s.reason}`);
         }
@@ -158,7 +158,7 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
           capital += proceeds;
           positions.delete(swap.sellSymbol);
           if (verbose && hadTrades) {
-            console.log(`   ─ Salg ${swap.sellSymbol}: ${pos.size.toFixed(4)} coins @ $${sellPrice.toFixed(4)} = $${gross.toFixed(2)} - fee $${feeAmt.toFixed(4)} → $${proceeds.toFixed(2)} modtaget`);
+            console.log(`   ─ Sell ${swap.sellSymbol}: ${pos.size.toFixed(4)} coins @ $${sellPrice.toFixed(4)} = $${gross.toFixed(2)} - fee $${feeAmt.toFixed(4)} → $${proceeds.toFixed(2)} received`);
           }
         }
       }
@@ -181,7 +181,7 @@ export async function pipelineSimulate(params: SimParams): Promise<PipelineResul
             entryValue: spend,
           });
           if (verbose && hadTrades) {
-            console.log(`   ─ Køb  ${swap.buySymbol}: ${size.toFixed(4)} coins @ $${buyPrice.toFixed(4)} = $${spend.toFixed(2)} anvendt (fee $${buyFee.toFixed(4)})`);
+            console.log(`   ─ Buy  ${swap.buySymbol}: ${size.toFixed(4)} coins @ $${buyPrice.toFixed(4)} = $${spend.toFixed(2)} spent (fee $${buyFee.toFixed(4)})`);
           }
         }
       }

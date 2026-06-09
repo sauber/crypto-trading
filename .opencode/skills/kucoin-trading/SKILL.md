@@ -1,56 +1,56 @@
 ---
 name: kucoin-trading
-description: KuCoin crypto trading agent med 6-rolle pipeline arkitektur. TypeScript/Deno projekt. Brug denne skill når du arbejder med trading agentens kode, strategier eller KuCoin API integration.
+description: KuCoin crypto trading agent with 6-role pipeline architecture. TypeScript/Deno project. Use this skill when working with the trading agent's code, strategies or KuCoin API integration.
 ---
 
-## Arkitektur (see AGENTS.md for detaljer)
+## Architecture (see AGENTS.md for details)
 
-Systemet består af 6 roller, der eksekveres i en pipeline hver time:
+The system consists of 6 roles, executed in a pipeline every hour:
 
 ```
 Discovery → Portfolio → Trading → Execution → Reflection → Communication
 ```
 
-- **Discovery**: Find top 20 USDT-pairs efter 24h volume (fast, ikke optimérbar)
-- **Portfolio**: Vurder ønsket/uønsket coins baseret på rank-ændring. Alloker positionsstørrelse.
-- **Trading**: Timing af swaps via tekniske indikatorer (RSI, MACD, BB). Signal på BÅDE buy og sell coin.
-- **Execution**: Udfør swaps — simuleret (kapital × (1-fee)) eller live (KuCoin market order).
-- **Reflection**: Saml beslutninger + outcomes, analyser success/fejl (kun live).
-- **Communication**: Rapporter status — silent i backtest, verbose i live.
+- **Discovery**: Find top 20 USDT-pairs by 24h volume (fast, not optimizable)
+- **Portfolio**: Assess wanted/unwanted coins based on rank change. Allocate position sizing.
+- **Trading**: Timing of swaps via technical indicators (RSI, MACD, BB). Signal on BOTH buy and sell coin.
+- **Execution**: Execute swaps — simulated (capital × (1-fee)) or live (KuCoin market order).
+- **Reflection**: Collect decisions + outcomes, analyze success/failure (live only).
+- **Communication**: Report status — silent in backtest, verbose in live.
 
-## Nøglekoncepter
+## Key concepts
 
 - **Runtime**: Deno 2.7+, TypeScript, strict mode
 - **Exchange**: KuCoin via REST API (sub-account)
-- **Pipeline backtest**: Hele pipeline køres bar-for-bar (ikke per-strategi isolation)
-- **Optimering**: BOHB over (portfolio_strat × portfolio_params) × (trading_strat × trading_params)
-- **Data**: `data/klines.json` downloades af `deno task testdata` — ingen API-kald under backtest/optimize
+- **Pipeline backtest**: Entire pipeline runs bar-by-bar (not per-strategy isolation)
+- **Optimization**: BOHB over (portfolio_strat × portfolio_params) × (trading_strat × trading_params)
+- **Data**: `data/klines.json` downloaded by `deno task testdata` — no API calls during backtest/optimize
 - **SOLID**: Single Responsibility per rolle, Open/Closed via RoleRegistry, Dependency Inversion via interfaces
 
 ## Environment variables
 
-| Variabel | Beskrivelse |
+| Variable | Description |
 |----------|-------------|
-| `KUCOIN_API_KEY` | API key fra KuCoin sub-account |
+| `KUCOIN_API_KEY` | API key from KuCoin sub-account |
 | `KUCOIN_API_SECRET` | API secret |
 | `KUCOIN_API_PASSPHRASE` | API passphrase |
-| `DRY_RUN` | `"true"` = ingen rigtige ordrer (live) |
+| `DRY_RUN` | `"true"` = no real orders (live) |
 
-## Kommandoer
+## Commands
 
 ```sh
-deno task testdata              # Download kline data (første gang)
-deno task backtest              # Kør pipeline backtest
-deno task optimize              # BOHB parameter-optimering
-deno task trade                 # Live trading (dry-run med DRY_RUN=true)
-deno check src/                 # Type-check hele projektet
-deno test --allow-read          # Kør tests
+deno task testdata              # Download kline data (first time)
+deno task backtest              # Run pipeline backtest
+deno task optimize              # BOHB parameter optimization
+deno task trade                 # Live trading (dry-run with DRY_RUN=true)
+deno check src/                 # Type-check entire project
+deno test --allow-read          # Run tests
 ```
 
-## Udviklingsnoter
+## Development notes
 
-- Hver strategi har sin egen mappe med `strategy.ts` + `config.ts`
-- Strategi-navne i `kebab-case`
+- Each strategy has its own directory with `strategy.ts` + `config.ts`
+- Strategy names in `kebab-case`
 - `import type` for type-only imports
-- Skriv test FØR implementering (TDD)
-- Se AGENTS.md for komplet arkitektur, interfaces, og migrationsplan
+- Write tests BEFORE implementation (TDD)
+- See AGENTS.md for complete architecture, interfaces, and migration plan

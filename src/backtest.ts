@@ -57,11 +57,11 @@ async function loadData(): Promise<{
     for (const [symbol, bars] of Object.entries(parsed.klines)) {
       klines.set(symbol, bars as Kline[]);
     }
-    console.log(`Indlæste ${klines.size} coins fra data/klines.json\n`);
+    console.log(`Loaded ${klines.size} coins from data/klines.json\n`);
     return { interval: parsed.interval, coins: parsed.coins, klines };
   } catch {
-    console.error("data/klines.json ikke fundet.");
-    console.error("Kør 'deno task testdata' for at downloade data.");
+    console.error("data/klines.json not found.");
+    console.error("Run 'deno task testdata' to download data.");
     Deno.exit(1);
   }
 }
@@ -91,22 +91,22 @@ const result = await pipelineSimulate({
   },
 });
 
-console.log(`=== Resultater ===`);
+console.log(`=== Results ===`);
 console.log(`Total Return:  ${result.totalReturn > 0 ? "+" : ""}${result.totalReturn.toFixed(2)}%`);
 console.log(`Sharpe Ratio:  ${result.sharpeRatio.toFixed(2)}`);
 console.log(`Max Drawdown:  ${result.maxDrawdown.toFixed(2)}%`);
 console.log(`Win Rate:      ${result.winRate.toFixed(1)}%`);
 console.log(`Profit Factor: ${result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)}`);
 console.log(`Total Trades:  ${result.totalTrades}`);
-console.log(`Equity Curve:  ${result.equityCurve.length} punkter`);
+console.log(`Equity Curve:  ${result.equityCurve.length} points`);
 
 if (result.trades.length > 0) {
-  console.log(`\n=== Transaktioner (${result.trades.length}) ===`);
+  console.log(`\n=== Transactions (${result.trades.length}) ===`);
   const wins = result.trades.filter((t) => t.pnlPct > 0).length;
   const losses = result.trades.filter((t) => t.pnlPct <= 0).length;
   console.log(`W/L: ${wins}/${losses}\n`);
 
-  const header = `${"#".padEnd(4)} ${"Sælg".padEnd(14)} → ${"Køb".padEnd(14)} ${"P/L %".padEnd(9)} ${"Bars".padEnd(5)} Årsag`;
+  const header = `${"#".padEnd(4)} ${"Sell".padEnd(14)} → ${"Buy".padEnd(14)} ${"P/L %".padEnd(9)} ${"Bars".padEnd(5)} Reason`;
   console.log(header);
   console.log("-".repeat(header.length));
 
@@ -118,13 +118,13 @@ if (result.trades.length > 0) {
     );
   }
 
-  console.log(`\nTop 5 vindere:`);
+  console.log(`\nTop 5 winners:`);
   const topWins = [...result.trades].sort((a, b) => b.pnlPct - a.pnlPct).slice(0, 5);
   for (const t of topWins) {
     console.log(`  +${t.pnlPct.toFixed(2)}% ${t.sellSymbol} → ${t.buySymbol} (${t.reason})`);
   }
 
-  console.log(`\nTop 5 tabere:`);
+  console.log(`\nTop 5 losers:`);
   const topLosses = [...result.trades].sort((a, b) => a.pnlPct - b.pnlPct).slice(0, 5);
   for (const t of topLosses) {
     console.log(`  ${t.pnlPct.toFixed(2)}% ${t.sellSymbol} → ${t.buySymbol} (${t.reason})`);

@@ -20,7 +20,7 @@ const KUCOIN_API_PASSPHRASE = Deno.env.get("KUCOIN_API_PASSPHRASE") || "";
 const DRY_RUN = Deno.env.get("DRY_RUN") === "true";
 
 if (!KUCOIN_API_KEY || !KUCOIN_API_SECRET || !KUCOIN_API_PASSPHRASE) {
-  console.error("Manglende KuCoin API credentials.");
+  console.error("Missing KuCoin API credentials.");
   Deno.exit(1);
 }
 

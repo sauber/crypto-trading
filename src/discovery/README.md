@@ -1,8 +1,8 @@
-# Discovery Rollen
+# Discovery Role
 
-## Funktionsbeskrivelse
+## Description
 
-Discovery-rollen har ansvar for at identificere de mest interessante coins at handle med, baseret på likviditet. For hver cyklus (eller bar i backtest) rangeres coins efter likviditet, og de **top N** mest likide returneres til resten af pipelinen.
+The Discovery role is responsible for identifying the most interesting coins to trade, based on liquidity. For each cycle (or bar in backtest), coins are ranked by liquidity, and the **top N** most liquid ones are returned to the rest of the pipeline.
 
 ## Definition
 
@@ -41,53 +41,53 @@ Likviditet udregnes som:
 liquidity = volume * closingPrice
 ```
 
-Jo højere værdi, desto mere likvid er coin'en. Dette bruges til at rangere coins og vælge de **top N**.
+The higher the value, the more liquid the coin. This is used to rank coins and select the **top N**.
 
 ## Strategier
 
 ### `testdata` (`FileDiscovery`)
 
-- **Anvendelse**: Backtest og optimering
-- **Datakilde**: Forud-indlæste `Kline[]` via `DiscoveryParams.klines`
-- **Parametre**: `{ topN: 20 }`
-- **Opførsel**: Ved hver bar i simulationen beregnes likviditet for alle coins i datasættet. De `topN` coins med højest likviditet returneres.
+- **Usage**: Backtest and optimization
+- **Data source**: Pre-loaded `Kline[]` via `DiscoveryParams.klines`
+- **Parameters**: `{ topN: 20 }`
+- **Behavior**: At each bar of the simulation, liquidity is calculated for all coins in the dataset. The `topN` coins with the highest liquidity are returned.
 
 ### `kucoin` (`KucoinDiscovery`)
 
-- **Anvendelse**: Live trading
-- **Datakilde**: KuCoin REST API (via `KucoinClient`)
-- **Parametre**: `{ topN: 20 }`
-- **Opførsel**: Henter de 50 mest handlede USDT-pairs fra KuCoin via ticker-data, henter candles for hver, beregner likviditet fra nyeste candle, og returnerer de `topN` coins.
+- **Usage**: Live trading
+- **Data source**: KuCoin REST API (via `KucoinClient`)
+- **Parameters**: `{ topN: 20 }`
+- **Behavior**: Fetches the 50 most traded USDT pairs from KuCoin via ticker data, fetches candles for each, calculates liquidity from the latest candle, and returns the `topN` coins.
 
-## Arkitektur
+## Architecture
 
 ```
 src/discovery/
-├── README.md              # Denne fil
+├── README.md              # This file
 ├── types.ts               # DiscoveryStrategy interface + DiscoveryConfig + DiscoveryParams
-├── testdata.ts            # FileDiscovery (testdata-strategi)
-├── testdata.config.ts     # Standardkonfiguration for testdata
-├── kucoin.ts              # KucoinDiscovery (live-strategi)
-├── kucoin.config.ts       # Standardkonfiguration for live
+├── testdata.ts            # FileDiscovery (testdata strategy)
+├── testdata.config.ts     # Default configuration for testdata
+├── kucoin.ts              # KucoinDiscovery (live strategy)
+├── kucoin.config.ts       # Default configuration for live
 ├── testdata.test.ts       # Unit tests for FileDiscovery
 └── kucoin.test.ts         # Unit tests for KucoinDiscovery
 ```
 
-## Registrering
+## Registration
 
-Strategier registreres i `src/roles/registration.ts` via `discoveryRegistry`:
+Strategies are registered in `src/roles/registration.ts` via `discoveryRegistry`:
 
 ```typescript
 discoveryRegistry.register("testdata", (config) => new FileDiscovery(config));
 discoveryRegistry.register("kucoin", (config, client) => new KucoinDiscovery(config, client));
 ```
 
-## Konfiguration
+## Configuration
 
-I `ROLE_CONFIG` i `src/roles/config.ts`:
+In `ROLE_CONFIG` in `src/roles/config.ts`:
 
 ```typescript
 discovery: { strategy: "kucoin", params: { topN: 20 } },
 ```
 
-Skift til `"testdata"` for at bruge testdata (relevant i test).
+Switch to `"testdata"` to use testdata (relevant in test).

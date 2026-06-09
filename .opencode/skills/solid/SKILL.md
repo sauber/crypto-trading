@@ -1,22 +1,22 @@
 ---
 name: solid
-description: SOLID-principper for modulær kode. Brug ved planlægning af modulstruktur, interfaces og afhængigheder.
+description: SOLID principles for modular code. Use when planning module structure, interfaces and dependencies.
 ---
 
-## SOLID — kort fortalt
+## SOLID — in short
 
 | Princip | Regel | Anvendelse |
 |---------|-------|------------|
-| **S** RP | En klasse/modul har ét ansvar | Hvert modul gør én ting. Split ved "mixed concerns" |
-| **O** CP | Åben for udvidelse, lukket for ændring | Brug interfaces/strategy pattern frem for if/switch |
-| **L** SP | Subtyper skal kunne erstatte base-typen | Interface skal opfyldes fuldt; smid ikke `unimplemented` |
-| **I** SP | Små, fokuserede interfaces > store | Split brede interfaces; klienter afhænger kun af dét de bruger |
-| **D** IP | Afhæng af abstraktioner, ikke konkrete klasser | Dependency injection; moduler kender ikke hinandens implementation |
+| **S** RP | A class/module has one responsibility | Each module does one thing. Split at "mixed concerns" |
+| **O** CP | Open for extension, closed for modification | Use interfaces/strategy pattern instead of if/switch |
+| **L** SP | Subtypes must be able to replace the base type | Interface must be fully implemented; don't throw `unimplemented` |
+| **I** SP | Small, focused interfaces > large ones | Split broad interfaces; clients depend only on what they use |
+| **D** IP | Depend on abstractions, not concrete classes | Dependency injection; modules don't know each other's implementation |
 
-## Retningslinjer
+## Guidelines
 
-- Interfaces i egne filer (fx `src/strategy/types.ts`)
-- Hver klasse i egen fil
-- Én dependency direction: `main → strategy → exchange → types`
-- Injection via constructor, ikke `new()` internt
-- Undgå cirkulære imports — refactor til fælles interface layer
+- Interfaces in their own files (e.g. `src/strategy/types.ts`)
+- Each class in its own file
+- One dependency direction: `main → strategy → exchange → types`
+- Injection via constructor, not `new()` internally
+- Avoid circular imports — refactor to shared interface layer

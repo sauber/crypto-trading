@@ -18,10 +18,10 @@ const now = Date.now();
 const startTime = now - DAYS_BACK * 86400000;
 const endTime = now;
 
-console.log(`Henter top ${TOP_N} coins efter 24h volume...`);
+console.log(`Fetching top ${TOP_N} coins by 24h volume...`);
 const topSymbols = await client.getTopVolumeSymbols(TOP_N);
 const symbols = topSymbols.map((s) => s.symbol);
-console.log(`Fundet ${symbols.length} coins, henter klines...`);
+console.log(`Found ${symbols.length} coins, fetching klines...`);
 
 const klines: Record<string, unknown[]> = {};
 let count = 0;
@@ -32,11 +32,11 @@ for (const symbol of symbols) {
     const data = await client.getKlines(symbol, CANDLE_INTERVAL, startTime, endTime);
     klines[symbol] = data;
   } catch (err) {
-    console.error(`\nFejl ved ${symbol}: ${err}`);
+    console.error(`\nError at ${symbol}: ${err}`);
   }
 }
 
-console.log(`\nGemmer ${Object.keys(klines).length} coins til data/klines.json ...`);
+console.log(`\nSaving ${Object.keys(klines).length} coins to data/klines.json ...`);
 const output = {
   interval: CANDLE_INTERVAL,
   coins: Object.keys(klines),
@@ -45,4 +45,4 @@ const output = {
 
 await Deno.mkdir("data", { recursive: true });
 await Deno.writeTextFile("data/klines.json", JSON.stringify(output, null, 2));
-console.log("Færdig!");
+console.log("Done!");

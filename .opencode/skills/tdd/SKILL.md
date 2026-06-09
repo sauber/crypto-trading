@@ -1,24 +1,24 @@
 ---
 name: tdd
-description: Test Driven Development — rød/grøn/refactor cyklus med fokus på testbar kode. Brug ved implementering af ny funktionalitet.
+description: Test Driven Development — red/green/refactor cycle focused on testable code. Use when implementing new functionality.
 ---
 
 ## TDD-cyklus
 
 ```
-  RØD     →  Skriv en test der fejler
-  GRØN    →  Skriv minimal kode så testen passerer
-  REFACTOR →  Forbedr koden uden at ændre opførsel
+  RED     →  Write a test that fails
+  GREEN    →  Write minimal code so the test passes
+  REFACTOR →  Improve the code without changing behavior
 ```
 
-## Arbejdsgang
+## Workflow
 
-1. **Før kode**: Definer test i `src/<modul>/<fil>.test.ts` (el. `_test.ts` for Deno)
-2. **Én test ad gangen**: Implementér kun nok til at gøre testen grøn
-3. **Refactor under grøn**: Ryd op, fjern duplikering, forbedr navngivning
-4. **Kør hele test-suiten** før commit — intet må være rødt
+1. **Before code**: Define test in `src/<module>/<file>.test.ts` (or `_test.ts` for Deno)
+2. **One test at a time**: Implement only enough to make the test green
+3. **Refactor under green**: Clean up, remove duplication, improve naming
+4. **Run the entire test suite** before commit — nothing should be red
 
-## Navnekonvention
+## Naming convention
 
 ```
 src/
@@ -28,20 +28,20 @@ src/
 │   └── fil.integration.ts # Integration tests
 ```
 
-- Test-filer placeres ved siden af den kode de tester
-- Brug `describe`/`it` til struktur: `describe("fil.ts")` → `it("gør X når Y")`
+- Test files are placed next to the code they test
+- Use `describe`/`it` for structure: `describe("file.ts")` → `it("does X when Y")`
 
 ## Teststruktur (AAA)
 
-| Fase | Formål |
+| Phase | Purpose |
 |------|--------|
-| **Arrange** | Sæt op: mock data, instantier objekter |
-| **Act** | Kald metoden / udfør handlingen |
-| **Assert** | Tjek resultat — én assertion pr. test (helst) |
+| **Arrange** | Set up: mock data, instantiate objects |
+| **Act** | Call the method / perform the action |
+| **Assert** | Check the result — one assertion per test (preferably) |
 
-## Regler
+## Rules
 
-- Skriv aldrig produktionskode uden en rød test der retfærdiggør den
-- Hvis en test er svær at skrive → dårlig kode. Refactor designet
-- Mocks kun ved eksterne kald (API, filsystem, clock)
-- Test grænser: `0`, `null`, `undefined`, `tom streng`, store tal, fejlcases
+- Never write production code without a red test that justifies it
+- If a test is difficult to write → bad code. Refactor the design
+- Mocks only for external calls (API, filesystem, clock)
+- Test boundaries: `0`, `null`, `undefined`, `empty string`, large numbers, error cases

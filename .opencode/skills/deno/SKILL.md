@@ -1,39 +1,39 @@
 ---
 name: deno
-description: Moderne Deno-praksis — imports, TypeScript, standardbibliotek, og tooling. Brug ved opsætning og daglig udvikling.
+description: Modern Deno practices — imports, TypeScript, standard library, and tooling. Use for setup and daily development.
 ---
 
 ## Imports & dependencies
 
-- Foretræk `jsr:` frem for `npm:` når biblioteket findes dér
-- Brug `deno add jsr:@lib/name` til at tilføje — opdaterer `deno.json` automatisk
-- Filspecifikke imports: `import { x } from "./fil.ts"` — altid `.ts`/.tsx ekstension
-- Undgå `import_map.json`; brug `imports` i `deno.json`
+- Prefer `jsr:` over `npm:` when the library exists there
+- Use `deno add jsr:@lib/name` to add — updates `deno.json` automatically
+- File-specific imports: `import { x } from "./file.ts"` — always `.ts`/.tsx extension
+- Avoid `import_map.json`; use `imports` in `deno.json`
 
 ## TypeScript
 
 - `strict: true` i `deno.json`
-- Foretræk `interface` over `type` for objekter
-- Brug `Deno.env.get("KEY")` til miljøvariabler — aldrig `process.env`
-- Async/await over `.then()` — ingen callbacks med mindre nødvendigt
+- Prefer `type` over `interface` for objects
+- Use `Deno.env.get("KEY")` for environment variables — never `process.env`
+- Async/await over `.then()` — no callbacks unless necessary
 
 ## Standardbibliotek (std)
 
 - `@std/assert` — test assertions
 - `@std/testing` — mocking, snapshot, bdd
 - `@std/fs` — filsystem (walk, exists, move)
-- `@std/path` — sti-manipulation
+- `@std/path` — path manipulation
 - `@std/dotenv` — `.env` load
 
 ## Proces & tooling
 
-| Værktøj | Brug |
+| Tool | Usage |
 |---------|------|
-| `deno fmt` | Formattering — ingen `prettier` |
-| `deno lint` | Linting — ingen `eslint` |
+| `deno fmt` | Formatting — no `prettier` |
+| `deno lint` | Linting — no `eslint` |
 | `deno check` | Type-check |
-| `deno test` | Test runner — ingen `jest`/`vitest` |
-| `deno task` | Task runner — ingen `package.json` scripts |
+| `deno test` | Test runner — no `jest`/`vitest` |
+| `deno task` | Task runner — no `package.json` scripts |
 
 ## Projektstruktur (anbefaling)
 
@@ -42,15 +42,15 @@ deno.json
 src/
 ├── main.ts           # Entrypoint
 ├── modul/
-│   ├── fil.ts        # Implementering
-│   ├── fil.test.ts   # Test ved siden af
+│   ├── fil.ts        # Implementation
+│   ├── fil.test.ts   # Test alongside
 │   └── fil.ts        # Public API barrel
-dev_deps.ts           # Samlede dev-dependencies (frivillig)
+dev_deps.ts           # Bundled dev-dependencies (optional)
 ```
 
-## Kodekonventioner
+## Code conventions
 
-- `camelCase` for funktioner/variable, `PascalCase` for klasser/interfaces
-- Navngiv test-filer `{navn}.test.ts` — Deno discoverer automatisk
-- Brug `export default` sparsomt — foretræk named exports
-- `const` frem for `let` medmindre rebinding er nødvendigt
+- `camelCase` for functions/variables, `PascalCase` for classes/interfaces
+- Name test files `{name}.test.ts` — Deno discovers automatically
+- Use `export default` sparingly — prefer named exports
+- `const` over `let` unless rebinding is necessary
