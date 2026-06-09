@@ -226,65 +226,6 @@ scripts/
 data/
 └── klines.json                     Cachede kline-data (ignoreret af git)
 ```
-
-## Migration — 5 faser
-
-### Fase 1: Testdata + RoleRegistry + pipelineSimulate
-**Nye filer:**
-- `src/engine/types.ts` — alle pipeline-typer
-- `src/engine/simulate.ts` — `pipelineSimulate()`
-- `src/roles/registry.ts` — `RoleRegistry<T>`
-- `src/roles/portfolio/types.ts` — `PortfolioStrategy` interface
-- `src/roles/trading/types.ts` — `TradingStrategy` interface
-- `scripts/download-data.ts` — henter klines for top 50 coins
-- `data/` — .gitignore
-
-**TDD:** test `pipelineSimulate()` med mock strategier
-
-**Verifikation:** `deno task testdata` downloader 50 coins, `deno check` ✅
-
-### Fase 2: Portfolio rank-trend + Trading rsi-timed + Execution simulate
-**Nye filer:**
-- `src/roles/portfolio/strategies/rank-trend/` (strategy.ts + config.ts)
-- `src/roles/trading/strategies/rsi-timed/` (strategy.ts + config.ts)
-- `src/roles/execution/strategies/simulate.ts`
-- `src/roles/communication/strategies/silent.ts`
-- `src/roles/reflection/strategies/noop.ts`
-- `src/backtest.ts` — entry der kalder pipelineSimulate
-- `src/roles/config.ts` — ROLE_CONFIG
-
-**TDD:** test rank-trend med kendt volume data, test mock pipeline
-
-**Verifikation:** `deno task backtest --portfolio=rank-trend --trading=rsi-timed` ✅
-
-### Fase 3: Flyt gamle strategier til Trading
-**Flyt:**
-- `src/strategies/momentum/` → `src/roles/trading/strategies/macd-timed/`
-- `src/strategies/mean-reversion/` → `src/roles/trading/strategies/bb-timed/`
-- `src/strategies/trend-following/` → `src/roles/trading/strategies/ema-adx-timed/`
-- `src/strategies/indicators.ts` → `src/indicators.ts`
-
-**Slet:**
-- `src/strategies/`, `src/risk/`, `src/config.ts`, `src/roles/portfolio/strategy.ts`, `src/roles/registry.ts` (gammel)
-
-**Verifikation:** `deno check` ✅, `deno task backtest --trading=macd-timed` ✅
-
-### Fase 4: Live trading engine
-**Nye filer:**
-- `src/engine/live.ts` — `TradingEngine` (loop med pipeline + live roller)
-- `src/roles/execution/strategies/kucoin.ts`
-- `src/roles/communication/strategies/verbose.ts`
-- `src/roles/reflection/strategies/analyst.ts`
-- `src/trade.ts` — entry
-
-**Verifikation:** `deno task trade` ✅ (dry-run)
-
-### Fase 5: Optimizer
-**Ny/opdateret:**
-- `src/optimize.ts` — BOHB over portfolio_params + trading_params
-
-**Verifikation:** `deno task optimize --portfolio=rank-trend --trading=rsi-timed` ✅
-
 ## Kommandoer
 
 ```sh

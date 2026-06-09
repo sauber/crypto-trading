@@ -1,14 +1,13 @@
 import type { Kline } from "./kucoin/types.ts";
-import { KucoinClient } from "./kucoin/client.ts";
-import { simulate } from "./strategies/simulate.ts";
-import type { SimConfig } from "./strategies/simulate.ts";
-import { getStrategyEntry } from "./strategies/registry.ts";
+import { pipelineSimulate } from "./engine/simulate.ts";
+import type { SimConfig } from "./engine/simulate.ts";
+import { ROLE_CONFIG } from "./roles/config.ts";
+import {
+  portfolioRegistry,
+  tradingRegistry,
+} from "./roles/registration.ts";
 
-const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";
-const KUCOIN_API_SECRET = Deno.env.get("KUCOIN_API_SECRET") || "";
-const KUCOIN_API_PASSPHRASE = Deno.env.get("KUCOIN_API_PASSPHRASE") || "";
 const CANDLE_INTERVAL = "1hour";
-const OPTIMIZE_COINS = 5;
 const MIN_DAYS = 15;
 const MAX_DAYS = 60;
 const ETA = 2;
@@ -16,19 +15,70 @@ const BRACKETS = 4;
 const INITIAL_CONFIGS = 20;
 const TPE_CANDIDATES = 1000;
 
-const stratArg = Deno.args.find((a) => a.startsWith("--strategy="));
-if (!stratArg) { console.error(`Brug: --strategy=${["momentum", "mean-reversion", "trend-following"].join("|")}`); Deno.exit(1); }
-const stratName = stratArg.split("=")[1];
-const entry = getStrategyEntry(stratName);
-
-const paramSpecs = entry.optimizableParams;
-const nDims = paramSpecs.length;
-
-function getParamIndex(key: string): number {
-  return paramSpecs.findIndex((p) => p.key === key);
+const portfolioArg = Deno.args.find((a) => a.startsWith("--portfolio="));
+const tradingArg = Deno.args.find((a) => a.startsWith("--trading="));
+if (!portfolioArg || !tradingArg) {
+  console.error(`Brug: deno task optimize --portfolio=rank-trend --trading=rsi-timed`);
+  Deno.exit(1);
 }
-const slIdx = getParamIndex("stopLossPct");
-const tpIdx = getParamIndex("takeProfitPct");
+const portfolioName = portfolioArg.split("=")[1];
+const tradingName = tradingArg.split("=")[1];
+
+if (!portfolioRegistry.has(portfolioName)) {
+  console.error(`Ukendt portfolio: ${portfolioName}. Mulige: ${portfolioRegistry.list().join(", ")}`);
+  Deno.exit(1);
+}
+if (!tradingRegistry.has(tradingName)) {
+  console.error(`Ukendt trading: ${tradingName}. Mulige: ${tradingRegistry.list().join(", ")}`);
+  Deno.exit(1);
+}
+
+interface ParamSpec {
+  key: string;
+  lo: number;
+  hi: number;
+  int: boolean;
+}
+
+const portfolioParamSpecs: Record<string, ParamSpec[]> = {
+  "rank-trend": [
+    { key: "maxPositions", lo: 2, hi: 10, int: true },
+  ],
+};
+
+const tradingParamSpecs: Record<string, ParamSpec[]> = {
+  "rsi-timed": [
+    { key: "rsiPeriod", lo: 5, hi: 30, int: true },
+    { key: "rsiOversold", lo: 20, hi: 40, int: true },
+    { key: "rsiOverbought", lo: 60, hi: 85, int: true },
+    { key: "minConfidence", lo: 10, hi: 90, int: true },
+  ],
+  "macd-timed": [
+    { key: "fastPeriod", lo: 5, hi: 20, int: true },
+    { key: "slowPeriod", lo: 20, hi: 50, int: true },
+    { key: "signalPeriod", lo: 5, hi: 15, int: true },
+    { key: "volumeThreshold", lo: 0.8, hi: 2.0, int: false },
+  ],
+  "bb-timed": [
+    { key: "rsiPeriod", lo: 5, hi: 30, int: true },
+    { key: "rsiOversold", lo: 20, hi: 40, int: true },
+    { key: "rsiOverbought", lo: 60, hi: 85, int: true },
+    { key: "bbPeriod", lo: 10, hi: 40, int: true },
+    { key: "bbStdDev", lo: 1.0, hi: 3.0, int: false },
+  ],
+  "ema-adx-timed": [
+    { key: "fastEMA", lo: 5, hi: 20, int: true },
+    { key: "slowEMA", lo: 15, hi: 50, int: true },
+    { key: "adxPeriod", lo: 7, hi: 30, int: true },
+    { key: "adxThreshold", lo: 15, hi: 40, int: true },
+  ],
+};
+
+const pSpecs = portfolioParamSpecs[portfolioName];
+const tSpecs = tradingParamSpecs[tradingName];
+const allSpecs = [...pSpecs, ...tSpecs];
+const nDims = allSpecs.length;
+const pCount = pSpecs.length;
 
 interface Trial {
   params: number[];
@@ -36,17 +86,33 @@ interface Trial {
 }
 
 function randomParams(): number[] {
-  return paramSpecs.map((p) => {
-    const v = p.lo + Math.random() * (p.hi - p.lo);
-    return p.int ? Math.round(v) : +v.toFixed(2);
+  return allSpecs.map((s) => {
+    const v = s.lo + Math.random() * (s.hi - s.lo);
+    return s.int ? Math.round(v) : +v.toFixed(2);
   });
 }
 
 function label(params: number[]): string {
-  return paramSpecs.map((p, i) => {
-    const v = p.int ? params[i].toString() : params[i].toFixed(2);
-    return `${p.key}=${v}`;
+  return allSpecs.map((s, i) => {
+    const v = s.int ? params[i].toString() : params[i].toFixed(2);
+    return `${s.key}=${v}`;
   }).join(" ");
+}
+
+function toPortfolioConfig(params: number[]): Record<string, unknown> {
+  const cfg: Record<string, unknown> = {};
+  for (let i = 0; i < pCount; i++) {
+    cfg[allSpecs[i].key] = allSpecs[i].int ? params[i] : params[i];
+  }
+  return cfg;
+}
+
+function toTradingConfig(params: number[]): Record<string, number> {
+  const cfg: Record<string, number> = {};
+  for (let i = pCount; i < nDims; i++) {
+    cfg[allSpecs[i].key] = params[i];
+  }
+  return cfg;
 }
 
 function scoreFunc(avgReturn: number, avgPF: number, avgDD: number): number {
@@ -91,54 +157,70 @@ function tpePropose(trials: Trial[], n: number): number[][] {
 
 async function evaluate(
   klineMap: Map<string, Kline[]>,
-  symbols: string[],
+  coins: string[],
   params: number[],
   days: number,
 ): Promise<number> {
-  let totalReturn = 0, totalPF = 0, totalDD = 0, validCoins = 0;
-  const strategy = entry.createFromParams(params);
+  const klines = new Map<string, Kline[]>();
+
+  for (const coin of coins) {
+    const all = klineMap.get(coin);
+    if (!all || all.length < 50) continue;
+    const n = Math.round(days * 24);
+    const slice = all.slice(Math.max(0, all.length - n));
+    if (slice.length < 50) continue;
+    klines.set(coin, slice);
+  }
+
+  if (klines.size === 0) return -Infinity;
+
+  const portfolioCfg = toPortfolioConfig(params);
+  const tradingCfg = toTradingConfig(params);
+
+  const portfolioStrategy = portfolioRegistry
+    .get(portfolioName)
+    .create(portfolioCfg);
+
+  const tradingStrategy = tradingRegistry
+    .get(tradingName)
+    .create(tradingCfg);
+
+  const coinsArr = [...klines.keys()];
   const sc: SimConfig = {
-    stopLossPct: slIdx >= 0 ? params[slIdx] : entry.stopLossPct,
-    takeProfitPct: tpIdx >= 0 ? params[tpIdx] : entry.takeProfitPct,
-    minCandles: entry.minCandles,
-    initialCapital: entry.initialCapital,
+    initialCapital: 10000,
+    maxPositions: (portfolioCfg.maxPositions as number) ?? 5,
+    fee: 0.001,
   };
 
-  for (const symbol of symbols) {
-    const allKlines = klineMap.get(symbol);
-    if (!allKlines || allKlines.length < sc.minCandles) continue;
-    const klines = allKlines.slice(Math.max(0, allKlines.length - Math.round(days * 24)));
-    if (klines.length < sc.minCandles) continue;
-    const r = simulate(symbol, klines, strategy, sc);
-    totalReturn += r.totalReturn; totalPF += r.profitFactor; totalDD += r.maxDrawdown; validCoins++;
-  }
-  if (validCoins === 0) return -Infinity;
-  return scoreFunc(totalReturn / validCoins, totalPF / validCoins, totalDD / validCoins);
+  const result = await pipelineSimulate({
+    portfolioStrategy,
+    tradingStrategy,
+    klines,
+    coins: coinsArr,
+    interval: CANDLE_INTERVAL,
+    config: sc,
+  });
+
+  const r = result.totalReturn;
+  const pf = result.profitFactor === Infinity ? 10 : result.profitFactor;
+  const dd = result.maxDrawdown;
+  return scoreFunc(r, pf, dd);
 }
 
-const client = new KucoinClient({
-  apiKey: KUCOIN_API_KEY, apiSecret: KUCOIN_API_SECRET, apiPassphrase: KUCOIN_API_PASSPHRASE,
-});
-
-const now = Date.now();
-const startTime = now - MAX_DAYS * 86400000;
-
-console.log(`=== BOHB Optimering: ${stratName} ===`);
-console.log(`Periode: ${new Date(startTime).toISOString().slice(0, 10)} - ${new Date(now).toISOString().slice(0, 10)}`);
-console.log(`Parametre: ${nDims} (${paramSpecs.map((p) => p.key).join(", ")})`);
-console.log(`Etas: ${ETA}, Brackets: ${BRACKETS}, Init/configs: ${INITIAL_CONFIGS}\n`);
-
-const topSymbols = await client.getTopVolumeSymbols(OPTIMIZE_COINS);
-const symbols = topSymbols.map((s) => s.symbol);
-console.log(`Coins: ${symbols.join(", ")}\n`);
-
+const data = JSON.parse(await Deno.readTextFile("data/klines.json"));
+const coins: string[] = data.coins;
+const rawKlines: Record<string, unknown[]> = data.klines;
 const klineMap = new Map<string, Kline[]>();
-for (const symbol of symbols) {
-  process.stdout.write(`Henter ${symbol}...`);
-  const klines = await client.getKlines(symbol, CANDLE_INTERVAL, startTime, now);
-  klineMap.set(symbol, klines);
-  console.log(` ${klines.length} candles`);
+for (const coin of coins) {
+  klineMap.set(coin, (rawKlines[coin] || []) as Kline[]);
 }
+
+console.log(`=== BOHB Optimering ===`);
+console.log(`Portfolio: ${portfolioName}`);
+console.log(`Trading:   ${tradingName}`);
+console.log(`Coins:     ${coins.length}`);
+console.log(`Parametre: ${nDims} (${allSpecs.map((s) => s.key).join(", ")})`);
+console.log(`Etas: ${ETA}, Brackets: ${BRACKETS}, Init/configs: ${INITIAL_CONFIGS}\n`);
 
 const levels = [MIN_DAYS, MIN_DAYS * ETA, MAX_DAYS];
 const allTrials: Trial[] = [];
@@ -147,7 +229,7 @@ let bestParams: number[] | null = null;
 let totalEvals = 0;
 
 for (let bracket = 0; bracket < BRACKETS; bracket++) {
-  console.log(`\n── Bracket ${bracket + 1}/${BRACKETS} ──`);
+  console.log(`── Bracket ${bracket + 1}/${BRACKETS} ──`);
   let candidates = tpePropose(allTrials, INITIAL_CONFIGS);
 
   for (let level = 0; level < levels.length; level++) {
@@ -157,7 +239,7 @@ for (let bracket = 0; bracket < BRACKETS; bracket++) {
     const results: { params: number[]; score: number }[] = [];
 
     for (const params of candidates) {
-      const score = await evaluate(klineMap, symbols, params, days);
+      const score = await evaluate(klineMap, coins, params, days);
       results.push({ params, score });
       allTrials.push({ params, score });
       totalEvals++;
@@ -176,48 +258,46 @@ for (let bracket = 0; bracket < BRACKETS; bracket++) {
   }
 }
 
-console.log(`\n=== BOHB Resultat (${stratName}) ===`);
+console.log(`\n=== BOHB Resultat ===`);
 console.log(`Totale evalueringer: ${totalEvals}\n`);
 if (bestParams) {
   console.log(`Bedste parametre:`);
   for (let i = 0; i < nDims; i++) {
-    console.log(`  ${paramSpecs[i].key} = ${bestParams[i]}`);
+    console.log(`  ${allSpecs[i].key} = ${bestParams[i]}`);
   }
   console.log(`  score = ${bestScore.toFixed(2)}`);
 
   console.log(`\n=== Verifikation på fuld data (60 dage) ===`);
-  const bestStrategy = entry.createFromParams(bestParams);
-  const bestSc: SimConfig = {
-    stopLossPct: slIdx >= 0 ? bestParams[slIdx] : entry.stopLossPct,
-    takeProfitPct: tpIdx >= 0 ? bestParams[tpIdx] : entry.takeProfitPct,
-    minCandles: entry.minCandles,
-    initialCapital: entry.initialCapital,
-  };
-  let vRet = 0, vPF = 0, vDD = 0, vc = 0;
-  for (const symbol of symbols) {
-    const klines = klineMap.get(symbol);
-    if (!klines) continue;
-    const r = simulate(symbol, klines, bestStrategy, bestSc);
-    vRet += r.totalReturn; vPF += r.profitFactor; vDD += r.maxDrawdown; vc++;
-    console.log(`  ${symbol.padEnd(12)} return=${r.totalReturn > 0 ? "+" : ""}${r.totalReturn}% PF=${r.profitFactor} DD=${r.maxDrawdown}%`);
-  }
-  console.log(`  ${"Gennemsnit".padEnd(12)} return=${(vRet/vc) > 0 ? "+" : ""}${(vRet/vc).toFixed(2)}% PF=${(vPF/vc).toFixed(2)} DD=${(vDD/vc).toFixed(2)}%`);
-}
+  const portfolioCfg = toPortfolioConfig(bestParams);
+  const tradingCfg = toTradingConfig(bestParams);
 
-const defaultStrategy = entry.create();
-console.log(`\n=== ${stratName} standard (reference) ===`);
-const defSc: SimConfig = {
-  stopLossPct: entry.stopLossPct,
-  takeProfitPct: entry.takeProfitPct,
-  minCandles: entry.minCandles,
-  initialCapital: entry.initialCapital,
-};
-let dRet = 0, dPF = 0, dDD = 0, dc = 0;
-for (const symbol of symbols) {
-  const klines = klineMap.get(symbol);
-  if (!klines) continue;
-  const r = simulate(symbol, klines, defaultStrategy, defSc);
-  dRet += r.totalReturn; dPF += r.profitFactor; dDD += r.maxDrawdown; dc++;
-  console.log(`  ${symbol.padEnd(12)} return=${r.totalReturn > 0 ? "+" : ""}${r.totalReturn}% PF=${r.profitFactor} DD=${r.maxDrawdown}%`);
+  const bestPortfolio = portfolioRegistry
+    .get(portfolioName)
+    .create(portfolioCfg);
+
+  const bestTrading = tradingRegistry
+    .get(tradingName)
+    .create(tradingCfg);
+
+  const sc: SimConfig = {
+    initialCapital: 10000,
+    maxPositions: (portfolioCfg.maxPositions as number) ?? 5,
+    fee: 0.001,
+  };
+
+  const result = await pipelineSimulate({
+    portfolioStrategy: bestPortfolio,
+    tradingStrategy: bestTrading,
+    klines: klineMap,
+    coins,
+    interval: CANDLE_INTERVAL,
+    config: sc,
+  });
+
+  console.log(`  Return:  ${result.totalReturn > 0 ? "+" : ""}${result.totalReturn.toFixed(2)}%`);
+  console.log(`  Sharpe:  ${result.sharpeRatio.toFixed(2)}`);
+  console.log(`  Max DD:  ${result.maxDrawdown.toFixed(2)}%`);
+  console.log(`  Win Rate: ${result.winRate.toFixed(1)}%`);
+  console.log(`  PF:      ${result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)}`);
+  console.log(`  Trades:  ${result.totalTrades}`);
 }
-console.log(`  ${"Gennemsnit".padEnd(12)} return=${(dRet/dc) > 0 ? "+" : ""}${(dRet/dc).toFixed(2)}% PF=${(dPF/dc).toFixed(2)} DD=${(dDD/dc).toFixed(2)}%`);

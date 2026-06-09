@@ -51,3 +51,9 @@ export interface SimData {
   coins: string[];
   klines: Map<string, Kline[]>;
 }
+
+export interface ExecutionResult {
+  positions: Map<string, PositionState>;
+  capital: number;
+  trades: TradeRecord[];
+}

@@ -1,12 +1,7 @@
 import type { PositionState, SwapPlan, Swap } from "../../engine/types.ts";
 import type { Kline } from "../../kucoin/types.ts";
 
-export interface TradingConfig {
-  rsiPeriod: number;
-  rsiOversold: number;
-  rsiOverbought: number;
-  minConfidence: number;
-}
+export type TradingConfig = Record<string, number>;
 
 export interface TradingStrategy {
   readonly name: string;

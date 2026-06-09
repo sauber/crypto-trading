@@ -1,85 +1,97 @@
-import { KucoinClient } from "./kucoin/client.ts";
-import { simulate } from "./strategies/simulate.ts";
-import type { SimConfig, SimResult } from "./strategies/simulate.ts";
-import { getStrategyEntry } from "./strategies/registry.ts";
+import { pipelineSimulate } from "./engine/simulate.ts";
+import { RankTrendPortfolio } from "./roles/portfolio/strategies/rank-trend/strategy.ts";
+import { config as rankTrendCfg } from "./roles/portfolio/strategies/rank-trend/config.ts";
+import { RsiTimedTrading } from "./roles/trading/strategies/rsi-timed/strategy.ts";
+import { config as rsiTimedCfg } from "./roles/trading/strategies/rsi-timed/config.ts";
+import { MacdTimedTrading } from "./roles/trading/strategies/macd-timed/strategy.ts";
+import { config as macdTimedCfg } from "./roles/trading/strategies/macd-timed/config.ts";
+import { BbTimedTrading } from "./roles/trading/strategies/bb-timed/strategy.ts";
+import { config as bbTimedCfg } from "./roles/trading/strategies/bb-timed/config.ts";
+import { EmaAdxTimedTrading } from "./roles/trading/strategies/ema-adx-timed/strategy.ts";
+import { config as emaAdxTimedCfg } from "./roles/trading/strategies/ema-adx-timed/config.ts";
+import type { Kline } from "./kucoin/types.ts";
 
-const stratArg = Deno.args.find((a) => a.startsWith("--strategy="));
-if (!stratArg) { console.error(`Brug: --strategy=${["momentum", "mean-reversion", "trend-following"].join("|")}`); Deno.exit(1); }
-const entry = getStrategyEntry(stratArg.split("=")[1]);
+function parseArgs() {
+  const portfolioArg = Deno.args.find((a) => a.startsWith("--portfolio="));
+  const tradingArg = Deno.args.find((a) => a.startsWith("--trading="));
+  const portfolio = portfolioArg?.split("=")[1] ?? "rank-trend";
+  const trading = tradingArg?.split("=")[1] ?? "rsi-timed";
+  return { portfolio, trading };
+}
 
-const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";
-const KUCOIN_API_SECRET = Deno.env.get("KUCOIN_API_SECRET") || "";
-const KUCOIN_API_PASSPHRASE = Deno.env.get("KUCOIN_API_PASSPHRASE") || "";
-const CANDLE_INTERVAL = "1hour";
-const TEST_DAYS = 60;
-const TEST_COINS = 10;
+function createPortfolioStrategy(name: string) {
+  switch (name) {
+    case "rank-trend":
+      return new RankTrendPortfolio(rankTrendCfg);
+    default:
+      throw new Error(`Unknown portfolio strategy: ${name}`);
+  }
+}
 
-const simConfig: SimConfig = {
-  stopLossPct: entry.stopLossPct,
-  takeProfitPct: entry.takeProfitPct,
-  minCandles: entry.minCandles,
-  initialCapital: entry.initialCapital,
-};
+function createTradingStrategy(name: string) {
+  switch (name) {
+    case "rsi-timed":
+      return new RsiTimedTrading(rsiTimedCfg);
+    case "macd-timed":
+      return new MacdTimedTrading(macdTimedCfg);
+    case "bb-timed":
+      return new BbTimedTrading(bbTimedCfg);
+    case "ema-adx-timed":
+      return new EmaAdxTimedTrading(emaAdxTimedCfg);
+    default:
+      throw new Error(`Unknown trading strategy: ${name}`);
+  }
+}
 
-const client = new KucoinClient({
-  apiKey: KUCOIN_API_KEY, apiSecret: KUCOIN_API_SECRET, apiPassphrase: KUCOIN_API_PASSPHRASE,
+async function loadData(): Promise<{
+  interval: string;
+  coins: string[];
+  klines: Map<string, Kline[]>;
+}> {
+  try {
+    const raw = await Deno.readTextFile("data/klines.json");
+    const parsed = JSON.parse(raw);
+    const klines = new Map<string, Kline[]>();
+    for (const [symbol, bars] of Object.entries(parsed.klines)) {
+      klines.set(symbol, bars as Kline[]);
+    }
+    console.log(`Indlæste ${klines.size} coins fra data/klines.json\n`);
+    return { interval: parsed.interval, coins: parsed.coins, klines };
+  } catch {
+    console.error("data/klines.json ikke fundet.");
+    console.error("Kør 'deno task testdata' for at downloade data.");
+    Deno.exit(1);
+  }
+}
+
+const args = parseArgs();
+console.log(`=== Pipeline Backtest ===`);
+console.log(`Portfolio: ${args.portfolio}`);
+console.log(`Trading:   ${args.trading}\n`);
+
+const data = await loadData();
+
+const portfolioStrategy = createPortfolioStrategy(args.portfolio);
+const tradingStrategy = createTradingStrategy(args.trading);
+
+const result = await pipelineSimulate({
+  portfolioStrategy,
+  tradingStrategy,
+  klines: data.klines,
+  coins: data.coins,
+  interval: data.interval,
+  config: {
+    initialCapital: 1000,
+    maxPositions: 5,
+    fee: 0.001,
+  },
 });
 
-const now = Date.now();
-const startTime = now - TEST_DAYS * 86400000;
-const endTime = now;
-
-console.log(`=== Backtest: ${entry.name} ===`);
-console.log(`Periode: ${new Date(startTime).toISOString().slice(0, 10)} - ${new Date(endTime).toISOString().slice(0, 10)}`);
-console.log(`SL: ${simConfig.stopLossPct * 100}%, TP: ${simConfig.takeProfitPct * 100}%\n`);
-
-const topSymbols = await client.getTopVolumeSymbols(TEST_COINS);
-const symbols = topSymbols.map((s) => s.symbol);
-
-const allResults: SimResult[] = [];
-
-for (const symbol of symbols) {
-  process.stdout.write(`${symbol}...`);
-  const klines = await client.getKlines(symbol, CANDLE_INTERVAL, startTime, endTime);
-  if (klines.length < simConfig.minCandles) {
-    console.log(` for lidt data (${klines.length})`);
-    continue;
-  }
-  const strategy = entry.create();
-  const result = simulate(symbol, klines, strategy, simConfig);
-  allResults.push(result);
-  console.log(` ${result.totalTrades} trades, return=${result.totalReturn > 0 ? "+" : ""}${result.totalReturn}%`);
-}
-
-for (const r of allResults) {
-  const sign = r.totalReturn > 0 ? "+" : "";
-  console.log(`\n${r.symbol} — return=${sign}${r.totalReturn}%  win=${r.winRate}%  trades=${r.totalTrades}  PF=${r.profitFactor}  DD=${r.maxDrawdown}%`);
-  for (const t of r.trades.slice(-10)) {
-    const ts = t.exitTime.slice(11, 19);
-    const reason = t.reason.length > 22 ? t.reason.slice(0, 22) + ".." : t.reason;
-    console.log(`  ${ts} ${reason.padEnd(24)} ${t.pnlPct > 0 ? "+" : ""}${t.pnlPct}% (${t.bars}t)`);
-  }
-}
-
-console.log(`\n=== Samlet Resultat (${allResults.length} coins) ===\n`);
-
-let totalTrades = 0, totalWins = 0, totalReturnSum = 0;
-let bestReturn = -Infinity, worstReturn = Infinity;
-let bestSymbol = "", worstSymbol = "";
-
-for (const r of allResults) {
-  totalTrades += r.totalTrades;
-  totalWins += r.totalTrades * r.winRate / 100;
-  totalReturnSum += r.totalReturn;
-  if (r.totalReturn > bestReturn) { bestReturn = r.totalReturn; bestSymbol = r.symbol; }
-  if (r.totalReturn < worstReturn) { worstReturn = r.totalReturn; worstSymbol = r.symbol; }
-}
-
-const avgReturn = totalReturnSum / allResults.length;
-const avgWinRate = totalTrades > 0 ? (totalWins / totalTrades * 100) : 0;
-
-console.log(`Samlede trades: ${totalTrades}`);
-console.log(`Avg win rate: ${avgWinRate.toFixed(1)}%`);
-console.log(`Avg return: ${avgReturn > 0 ? "+" : ""}${avgReturn.toFixed(2)}%`);
-console.log(`Bedste: ${bestSymbol} ${bestReturn > 0 ? "+" : ""}${bestReturn.toFixed(2)}%`);
-console.log(`Værste: ${worstSymbol} ${worstReturn > 0 ? "+" : ""}${worstReturn.toFixed(2)}%`);
+console.log(`=== Resultater ===`);
+console.log(`Total Return:  ${result.totalReturn > 0 ? "+" : ""}${result.totalReturn.toFixed(2)}%`);
+console.log(`Sharpe Ratio:  ${result.sharpeRatio.toFixed(2)}`);
+console.log(`Max Drawdown:  ${result.maxDrawdown.toFixed(2)}%`);
+console.log(`Win Rate:      ${result.winRate.toFixed(1)}%`);
+console.log(`Profit Factor: ${result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)}`);
+console.log(`Total Trades:  ${result.totalTrades}`);
+console.log(`Equity Curve:  ${result.equityCurve.length} punkter`);
