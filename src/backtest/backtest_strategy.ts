@@ -1,7 +1,7 @@
 import { Market } from "@sauber/backtest";
-import { loadMarket, backtest, display, evaluate } from "./backtest/mod.ts";
-import { timeline } from "./market/mod.ts";
-import { RsiTimed } from "./strategy/mod.ts";
+import { loadMarket, backtest, display, evaluate } from "./mod.ts";
+import { timeline } from "../market/mod.ts";
+import { RsiTimed } from "../strategy/mod.ts";
 
 const strategy = RsiTimed({ targetPositions: 5 });
 const marketObj = await loadMarket();

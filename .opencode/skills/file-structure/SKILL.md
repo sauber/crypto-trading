@@ -44,3 +44,18 @@ export { config as rsiTimedCfg } from "./rsi-timed.config.ts";
 - Strategy names: kebab-case (`rsi-timed`, `macd-timed`)
 - Classes/interfaces: PascalCase
 - Config constants: `config` (renamed on import)
+
+## Entry-point scripts
+
+CLI entry points that wrap a module's functionality live inside that module's directory.
+Each file describes its action with a `<verb>_<noun>.ts` name:
+
+```
+src/market/download_data.ts
+src/backtest/backtest_strategy.ts
+src/optimize/optimize_parameters.ts
+src/trade/trade_account.ts
+```
+
+Tasks in `deno.json` reference these scripts by their full path.
+No `mod.ts` is needed for script-only directories.

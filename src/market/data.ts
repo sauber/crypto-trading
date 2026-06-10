@@ -1,6 +1,6 @@
 import type { Kline } from "../kucoin/mod.ts";
 
-interface DataCache {
+export interface DataCache {
   klines: Map<string, Kline[]>;
   coins: string[];
 }
@@ -27,4 +27,14 @@ export async function getData(): Promise<DataCache> {
 
   _cache = { klines, coins: parsed.coins as string[] };
   return _cache;
+}
+
+/** @internal Inject cached test data, bypassing file read. */
+export function _setTestData(data: DataCache): void {
+  _cache = data;
+}
+
+/** @internal Clear cache so next getData() re-reads from disk. */
+export function _resetCache(): void {
+  _cache = null;
 }

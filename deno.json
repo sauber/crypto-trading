@@ -1,9 +1,9 @@
 {
   "tasks": {
-    "testdata": "deno run --allow-net --allow-read=data --allow-write=data src/market/download.ts",
-    "backtest": "deno run --allow-read=data src/backtest.ts",
-    "optimize": "deno run --allow-read=data src/optimize.ts",
-    "trade": "deno run --allow-net --env-file=.env src/trade.ts"
+    "testdata": "deno run --allow-net --allow-read=data --allow-write=data src/market/download_data.ts",
+    "backtest": "deno run --allow-read=data src/backtest/backtest_strategy.ts",
+    "optimize": "deno run --allow-read=data src/optimize/optimize_parameters.ts",
+    "trade": "deno run --allow-net --env-file=.env src/trade/trade_account.ts"
   },
   "imports": {
     "@sauber/backtest": "jsr:@sauber/backtest@^3.4.0",

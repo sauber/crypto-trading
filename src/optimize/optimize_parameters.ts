@@ -1,10 +1,10 @@
 import { Market } from "@sauber/backtest";
-import { BOHB } from "./optimize/bohb.ts";
-import type { ParamSpec } from "./optimize/types.ts";
-import { backtest } from "./backtest/mod.ts";
-import { market, timeline } from "./market/mod.ts";
-import type { Timeline } from "./market/mod.ts";
-import { strategyRegistry } from "./registry/registration.ts";
+import { BOHB } from "./bohb.ts";
+import type { ParamSpec } from "./types.ts";
+import { backtest } from "../backtest/mod.ts";
+import { market, timeline } from "../market/mod.ts";
+import type { Timeline } from "../market/mod.ts";
+import { strategyRegistry } from "../registry/registration.ts";
 
 const strategyArg = Deno.args.find((a) => a.startsWith("--strategy="));
 if (!strategyArg) {

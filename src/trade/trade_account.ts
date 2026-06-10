@@ -1,9 +1,9 @@
-import { KucoinClient } from "./kucoin/mod.ts";
-import { TradingEngine } from "./engine/live.ts";
-import type { LiveEngineConfig } from "./engine/live.ts";
-import { strategyRegistry } from "./registry/registration.ts";
-import { CONFIG } from "./config.ts";
-import type { KucoinConfig } from "./kucoin/mod.ts";
+import { KucoinClient } from "../kucoin/mod.ts";
+import { TradingEngine } from "../engine/live.ts";
+import type { LiveEngineConfig } from "../engine/live.ts";
+import { strategyRegistry } from "../registry/registration.ts";
+import { CONFIG } from "../config.ts";
+import type { KucoinConfig } from "../kucoin/mod.ts";
 
 const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";
 const KUCOIN_API_SECRET = Deno.env.get("KUCOIN_API_SECRET") || "";
