@@ -32,10 +32,11 @@ export async function getData(): Promise<DataCache> {
   return _cache;
 }
 
-/** Build RankedInstrument[] from cached klines. Computes per-tick rank (by volume×close) and rank-change series. */
-export async function market(): Promise<RankedInstrument[]> {
-  const { klines, coins } = await getData();
-
+/** Build RankedInstrument[] from klines map. Computes per-tick rank (by volume×close) and rank-change series. */
+export function buildRankedInstruments(
+  klines: Map<string, Kline[]>,
+  coins: string[],
+): RankedInstrument[] {
   if (coins.length === 0) return [];
 
   const tickCount = klines.get(coins[0])?.length ?? 0;
@@ -80,4 +81,10 @@ export async function market(): Promise<RankedInstrument[]> {
       new Float32Array(bars.map((b) => b.volume)),
     );
   });
+}
+
+/** Load cached klines and build RankedInstrument[]. */
+export async function market(): Promise<RankedInstrument[]> {
+  const { klines, coins } = await getData();
+  return buildRankedInstruments(klines, coins);
 }

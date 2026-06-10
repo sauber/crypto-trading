@@ -1,49 +1,56 @@
-import type { KucoinClient } from "../kucoin/mod.ts";
+import type { KucoinClient, Kline } from "../kucoin/mod.ts";
+import { buildRankedInstruments, RankedInstrument } from "../market/mod.ts";
 
-export interface CoinCandidate {
-  symbol: string;
-  score: number;
-  reason: string;
+const INTERVAL_MS: Record<string, number> = {
+  "1min": 60000,
+  "3min": 180000,
+  "5min": 300000,
+  "15min": 900000,
+  "30min": 1800000,
+  "1hour": 3600000,
+  "2hour": 7200000,
+  "4hour": 14400000,
+  "6hour": 21600000,
+  "8hour": 28800000,
+  "12hour": 43200000,
+  "1day": 86400000,
+  "1week": 604800000,
+};
+
+export interface DiscoveryConfig {
+  poolSize?: number;
+  interval?: string;
+  lookback?: number;
 }
 
-const CANDIDATE_POOL = 50;
-const FETCH_INTERVAL = "1hour";
-const FETCH_RANGE_MS = 86400000;
-
 export function KucoinDiscovery(
-  config: { topN: number },
+  config: DiscoveryConfig,
   client: KucoinClient,
-): () => Promise<CoinCandidate[]> {
-  const { topN } = config;
+): () => Promise<RankedInstrument[]> {
+  const { poolSize = 50, interval = "1hour", lookback = 24 } = config;
+  const rangeMs = lookback * (INTERVAL_MS[interval] ?? 3600000);
 
-  const strategy = async (): Promise<CoinCandidate[]> => {
-    const pool = await client.getTopVolumeSymbols(CANDIDATE_POOL);
+  const strategy = async (): Promise<RankedInstrument[]> => {
+    const pool = await client.getTopVolumeSymbols(poolSize);
     const now = Date.now();
-    const candidates: CoinCandidate[] = [];
+    const klines = new Map<string, Kline[]>();
+    const symbols: string[] = [];
 
     for (const s of pool) {
       try {
-        const klines = await client.getKlines(
-          s.symbol,
-          FETCH_INTERVAL,
-          now - FETCH_RANGE_MS,
-          now,
-        );
-        if (klines.length === 0) continue;
-        const last = klines[klines.length - 1];
-        const liquidity = last.volume * last.close;
-        candidates.push({
-          symbol: s.symbol,
-          score: liquidity,
-          reason: `liquidity=${liquidity.toFixed(2)} (volume*close)`,
-        });
+        const k = await client.getKlines(s.symbol, interval, now - rangeMs, now);
+        if (k.length === 0) continue;
+        k.sort((a, b) => a.timestamp - b.timestamp);
+        klines.set(s.symbol, k);
+        symbols.push(s.symbol);
       } catch {
         // skip failed kline fetches
       }
     }
 
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates.slice(0, topN);
+    if (symbols.length === 0) return [];
+
+    return buildRankedInstruments(klines, symbols);
   };
 
   Object.defineProperty(strategy, "name", { value: "kucoin" });

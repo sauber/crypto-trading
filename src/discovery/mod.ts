@@ -1,2 +1,2 @@
-export type { CoinCandidate } from "./kucoin.ts";
 export { KucoinDiscovery } from "./kucoin.ts";
+export type { DiscoveryConfig } from "./kucoin.ts";

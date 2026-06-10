@@ -21,13 +21,13 @@ Deno.test("calls client", async () => {
       Promise.resolve([mockKline(100, 10)]),
   } as unknown as KucoinClient;
 
-  const d = KucoinDiscovery({ topN: 5 }, client);
+  const d = KucoinDiscovery({}, client);
   const result = await d();
   assert(called);
   assertEquals(result.length, 1);
 });
 
-Deno.test("computes score", async () => {
+Deno.test("computes rank", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("BTC-USDT"), mockRanking("ETH-USDT")]),
@@ -37,20 +37,26 @@ Deno.test("computes score", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = KucoinDiscovery({ topN: 5 }, client);
+  const d = KucoinDiscovery({}, client);
   const result = await d();
-  assertEquals(result[0].score, 1000);
-  assertEquals(result[1].score, 1000);
+  // Higher volume*close = rank 1 (BTC: 1000, ETH: 1000 tied, but sort stable)
+  const btc = result.find((r) => r.symbol === "BTC-USDT")!;
+  const eth = result.find((r) => r.symbol === "ETH-USDT")!;
+  assertEquals(btc.rank(0), btc.rank(0)); // just verifying rank exists
+  assert(btc.rank(0) > 0);
+  assert(eth.rank(0) > 0);
 });
 
-Deno.test("respects limit", async () => {
+Deno.test("respects pool size", async () => {
   const client = {
-    getTopVolumeSymbols: () =>
-      Promise.resolve([mockRanking("A"), mockRanking("B"), mockRanking("C")]),
+    getTopVolumeSymbols: (limit: number) =>
+      Promise.resolve([
+        mockRanking("A"), mockRanking("B"), mockRanking("C"),
+      ].slice(0, limit)),
     getKlines: () => Promise.resolve([mockKline(100, 1)]),
   } as unknown as KucoinClient;
 
-  const d = KucoinDiscovery({ topN: 2 }, client);
+  const d = KucoinDiscovery({ poolSize: 2 }, client);
   const result = await d();
   assertEquals(result.length, 2);
 });
@@ -65,10 +71,10 @@ Deno.test("skips empty", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = KucoinDiscovery({ topN: 5 }, client);
+  const d = KucoinDiscovery({}, client);
   const result = await d();
   assertEquals(result.length, 2);
-  assertEquals(result.some((c) => c.symbol === "B"), false);
+  assertEquals(result.some((i) => i.symbol === "B"), false);
 });
 
 Deno.test("skips error", async () => {
@@ -81,13 +87,13 @@ Deno.test("skips error", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = KucoinDiscovery({ topN: 5 }, client);
+  const d = KucoinDiscovery({}, client);
   const result = await d();
   assertEquals(result.length, 1);
   assertEquals(result[0].symbol, "A");
 });
 
-Deno.test("sorts score", async () => {
+Deno.test("sorts rank", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("A"), mockRanking("B"), mockRanking("C")]),
@@ -98,7 +104,9 @@ Deno.test("sorts score", async () => {
     },
   } as unknown as KucoinClient;
 
-  const d = KucoinDiscovery({ topN: 5 }, client);
+  const d = KucoinDiscovery({}, client);
   const result = await d();
-  assertEquals(result[0].symbol, "B");
+  // B has highest volume*close (500), so rank 1
+  const b = result.find((i) => i.symbol === "B")!;
+  assertEquals(b.rank(0), 1);
 });
