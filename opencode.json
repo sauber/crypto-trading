@@ -1,4 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["AGENTS.md"]
+  "instructions": ["AGENTS.md"],
+  "lsp": {
+    "deno": {
+      "command": ["deno", "lsp"],
+      "extensions": ["ts", "tsx", "js", "jsx", "mjs", "mjsx", "cjs", "mts", "mtsx", "cts"]
+    }
+  }
 }
