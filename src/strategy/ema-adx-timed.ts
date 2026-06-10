@@ -1,5 +1,5 @@
 import type { Strategy, BuyOrder, SellOrder } from "@sauber/backtest";
-import type { RankedInstrument } from "../backtest/ranked-instrument.ts";
+import type { RankedInstrument } from "../market/ranked-instrument.ts";
 import type { ReasonLogEntry } from "../backtest/mod.ts";
 import { ema, adx } from "../indicators.ts";
 

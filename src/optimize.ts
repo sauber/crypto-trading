@@ -1,6 +1,9 @@
+import { Market } from "@sauber/backtest";
 import { BOHB } from "./optimize/bohb.ts";
 import type { ParamSpec } from "./optimize/types.ts";
-import { loadMarket, backtest } from "./backtest/mod.ts";
+import { backtest } from "./backtest/mod.ts";
+import { market, timeline } from "./market/mod.ts";
+import type { Timeline } from "./market/mod.ts";
 import { strategyRegistry } from "./registry/registration.ts";
 
 const strategyArg = Deno.args.find((a) => a.startsWith("--strategy="));
@@ -57,7 +60,9 @@ console.log(`Strategy: ${strategyName}`);
 console.log(`Parameters: ${specs.length} (${specs.map((s) => s.key).join(", ")})`);
 console.log("");
 
-const market = await loadMarket();
+const instruments = await market();
+const marketObj = new Market(instruments);
+const tl = await timeline();
 
 function evaluate(params: number[], _budget: number): number {
   const cfg: Record<string, number> = {};
@@ -66,7 +71,7 @@ function evaluate(params: number[], _budget: number): number {
   }
 
   const strategy = strategyRegistry.get(strategyName).create(cfg);
-  const result = backtest(market, strategy as never, 10000, 0.001);
+  const result = backtest(marketObj, strategy as never, 10000, 0.001, tl);
 
   const r = result.totalReturn;
   const pf = result.profitFactor === Infinity ? 10 : result.profitFactor;

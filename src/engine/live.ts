@@ -1,6 +1,6 @@
 import { Portfolio, OpenPosition, type Strategy, type BuyOrder, type SellOrder, type Instrument } from "@sauber/backtest";
 import { KucoinClient } from "../kucoin/mod.ts";
-import { RankedInstrument } from "../backtest/ranked-instrument.ts";
+import { RankedInstrument } from "../market/ranked-instrument.ts";
 import type { Kline } from "../kucoin/mod.ts";
 
 type Order = BuyOrder | SellOrder;

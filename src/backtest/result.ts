@@ -1,5 +1,5 @@
 import type { Backtest, Strategy } from "@sauber/backtest";
-import type { TickConverter } from "./tick-converter.ts";
+import type { Timeline } from "../market/mod.ts";
 
 export interface TradeRecord {
   entryTime: string;
@@ -64,7 +64,7 @@ function generateAnalystComment(
 export function collectResults(
   backtest: Backtest,
   strategy: Strategy,
-  converter: TickConverter,
+  tl: Timeline,
   initialCapital: number,
 ): BacktestResults {
   const reasonLog = getReasonLog(strategy);
@@ -96,8 +96,8 @@ export function collectResults(
     );
 
     return {
-      entryTime: converter.tickToISO(tx.start),
-      exitTime: converter.tickToISO(tx.end),
+      entryTime: tl.toDate(tx.start).toISOString(),
+      exitTime: tl.toDate(tx.end).toISOString(),
       entryPrice: tx.invested / tx.quantity,
       exitPrice: (tx.invested + tx.profit) / tx.quantity,
       pnlPct,

@@ -1,18 +1,11 @@
-import { Market } from "@sauber/backtest";
-import type { Kline } from "../kucoin/mod.ts";
+import { getData } from "./data.ts";
 import { RankedInstrument } from "./ranked-instrument.ts";
-import { TickConverter } from "./tick-converter.ts";
 
-export interface MarketData {
-  market: Market;
-  converter: TickConverter;
-  minBars: number;
-}
+/** Build RankedInstrument[] from cached klines. Computes per-tick rank (by volume×close) and rank-change series. */
+export async function market(): Promise<RankedInstrument[]> {
+  const { klines, coins } = await getData();
 
-export function buildMarketData(
-  klines: Map<string, Kline[]>,
-  coins: string[],
-): MarketData {
+  // Find the minimum bar count across all coins
   const barCounts = coins.map((c) => (klines.get(c) || []).length);
   const minBars = Math.min(...barCounts);
 
@@ -20,6 +13,7 @@ export function buildMarketData(
     throw new Error(`Not enough data: need at least 2 bars, got ${minBars}`);
   }
 
+  // Allocate rank and rank-change arrays
   const rankData = new Map<string, Float32Array>();
   const rankChangeData = new Map<string, Float32Array>();
 
@@ -28,6 +22,7 @@ export function buildMarketData(
     rankChangeData.set(coin, new Float32Array(minBars));
   }
 
+  // Score each coin by volume×close for the current tick, then assign rank
   for (let tick = 0; tick < minBars; tick++) {
     const scored = coins.map((coin) => {
       const bar = (klines.get(coin) || [])[tick];
@@ -39,6 +34,7 @@ export function buildMarketData(
     }
   }
 
+  // Compute rank change between consecutive ticks (positive = gaining rank)
   for (const coin of coins) {
     const r = rankData.get(coin)!;
     const rc = rankChangeData.get(coin)!;
@@ -48,8 +44,9 @@ export function buildMarketData(
     }
   }
 
+  // Build one RankedInstrument per symbol with close, rank, rank-change, and volume series
   const allSymbols = [...klines.keys()];
-  const instruments = allSymbols.map((symbol) => {
+  return allSymbols.map((symbol) => {
     const bars = klines.get(symbol)!;
     return new RankedInstrument(
       new Float32Array(bars.map((b) => b.close)),
@@ -61,10 +58,4 @@ export function buildMarketData(
       new Float32Array(bars.map((b) => b.volume)),
     );
   });
-
-  return {
-    market: new Market(instruments),
-    converter: new TickConverter(klines, coins[0]),
-    minBars,
-  };
 }
