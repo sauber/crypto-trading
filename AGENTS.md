@@ -17,6 +17,8 @@ See per-component AGENTS.md for interface details:
 - [`src/execution/AGENTS.md`](src/execution/AGENTS.md) — simulated or live KuCoin market orders
 - [`src/reflection/AGENTS.md`](src/reflection/AGENTS.md) — decision logging + outcome analysis
 - [`src/communication/AGENTS.md`](src/communication/AGENTS.md) — cycle logging + event journal
+- [`src/hyperband/AGENTS.md`](src/hyperband/AGENTS.md) — standalone BOHB hyperparameter optimizer
+- [`src/optimize/AGENTS.md`](src/optimize/AGENTS.md) — project-aware parameter optimizer
 - [`src/engine/AGENTS.md`](src/engine/AGENTS.md) — pipeline simulate, live engine, shared types
 - [`src/position/AGENTS.md`](src/position/AGENTS.md) — portfolio state initialization
 - [`src/registry/AGENTS.md`](src/registry/AGENTS.md) — strategy registration & lookup
@@ -69,7 +71,8 @@ deno task test                      # Run tests
 src/
 ├── trade.ts              Live entry point
 ├── backtest.ts           Backtest entry point
-├── optimize.ts           BOHB optimizer entry point
+├── hyperband/            Standalone BOHB optimization algorithm
+├── optimize/             Project-aware parameter optimizer task
 ├── config.ts             ROLE_CONFIG — active strategies per role
 ├── indicators.ts         Shared indicator functions
 ├── engine/               Pipeline simulate + live engine + types

@@ -1,4 +1,4 @@
-import type { BOHBProgress, BOHBResult } from "./types.ts";
+import type { BOHBProgress, BOHBResult } from "../hyperband/mod.ts";
 
 export function optimizeProgressCallback(p: BOHBProgress): void {
   const bestStr = p.bestScore === -Infinity ? "-∞" : p.bestScore.toFixed(2);

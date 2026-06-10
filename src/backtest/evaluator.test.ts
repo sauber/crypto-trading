@@ -1,7 +1,7 @@
 import { assertEquals, assert, assertThrows } from "@std/assert";
 import { compactify, generateConfigContent, optimizeProgressCallback, displayBestConfig } from "../optimize/optimize_cli.ts";
 import { createParamEvaluator, evaluateParams } from "./evaluator.ts";
-import type { ParamSpec, BOHBProgress, BOHBResult } from "../optimize/types.ts";
+import type { ParamSpec, BOHBProgress, BOHBResult } from "../hyperband/mod.ts";
 
 Deno.test("compactify returns integer as string", () => {
   assertEquals(compactify(42), "42");

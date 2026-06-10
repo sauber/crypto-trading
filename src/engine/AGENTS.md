@@ -31,5 +31,5 @@ For each bar:
 ## Entry points
 
 - `backtest.ts` — standalone backtest runner
-- `optimize.ts` — BOHB hyperparameter optimization
+- `optimize/optimize_parameters.ts` — BOHB hyperparameter optimization
 - `trade.ts` — live trading loop

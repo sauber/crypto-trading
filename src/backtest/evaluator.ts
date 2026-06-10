@@ -4,7 +4,7 @@ import { backtest } from "./mod.ts";
 import { evaluate } from "./result.ts";
 import { strategyRegistry } from "../registry/registration.ts";
 import type { Timeline } from "../market/mod.ts";
-import type { ParamSpec } from "../optimize/types.ts";
+import type { ParamSpec } from "../hyperband/mod.ts";
 
 export function evaluateParams(
   params: number[],

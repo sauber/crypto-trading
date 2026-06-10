@@ -1,4 +1,4 @@
-import type { ParamSpec } from "./types.ts";
+import type { ParamSpec } from "../hyperband/mod.ts";
 
 export const paramSpecs: Record<string, ParamSpec[]> = {
   "rebalancer": [

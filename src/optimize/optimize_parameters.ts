@@ -1,5 +1,5 @@
 import { Market } from "@sauber/backtest";
-import { BOHB } from "./bohb.ts";
+import { BOHB } from "../hyperband/mod.ts";
 import { paramSpecs } from "./param_specs.ts";
 import { parseStrategyArg } from "./strategy_arg.ts";
 import { createParamEvaluator } from "../backtest/evaluator.ts";
