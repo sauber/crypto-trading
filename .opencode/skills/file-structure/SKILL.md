@@ -39,8 +39,7 @@ export { config as rsiTimedCfg } from "./rsi-timed.config.ts";
 
 ## Naming
 
-- Files: `PascalCase.ts` (e.g., `rank-trend.ts` → file is `PascalCase.ts`? No, camelCase for files actually)
-- Actually: files are camelCase (`rsi-timed.ts`, `rank-trend.ts`)
+- Files: camelCase (`rsi-timed.ts`, `rank-trend.ts`)
 - Strategy names: kebab-case (`rsi-timed`, `macd-timed`)
 - Classes/interfaces: PascalCase
 - Config constants: `config` (renamed on import)
@@ -51,7 +50,7 @@ CLI entry points that wrap a module's functionality live inside that module's di
 Each file describes its action with a `<verb>_<noun>.ts` name:
 
 ```
-src/market/download_data.ts
+src/market/download_data_cli.ts
 src/backtest/backtest_strategy.ts
 src/optimize/optimize_parameters.ts
 src/trade/trade_account.ts
@@ -59,3 +58,22 @@ src/trade/trade_account.ts
 
 Tasks in `deno.json` reference these scripts by their full path.
 No `mod.ts` is needed for script-only directories.
+
+## Script conventions
+
+Scripts are thin wrappers containing only:
+
+- imports of modules and functions
+- CLI argument parsing (via imported functions)
+- data / config loading
+- constant definitions
+- sequential calls to imported functions
+- console output
+
+Scripts must NOT contain:
+
+- function definitions (`function` keyword or arrow assignments)
+- loops (`for`, `while`, `do...while`)
+- branching (`if`/`else`/`switch`/ternary)
+
+All logic lives in imported modules. Callbacks are defined in their own module files, not inline.

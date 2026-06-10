@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "testdata": "deno run --allow-net --allow-read=data --allow-write=data src/market/download_data.ts",
+    "testdata": "deno run --allow-net --allow-read=data --allow-write=data src/market/download_data_cli.ts",
     "backtest": "deno run --allow-read=data src/backtest/backtest_strategy.ts",
     "optimize": "deno run --allow-read=data src/optimize/optimize_parameters.ts",
     "trade": "deno run --allow-net --env-file=.env src/trade/trade_account.ts"

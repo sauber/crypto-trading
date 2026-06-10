@@ -63,7 +63,3 @@ export async function downloadData(opts: DownloadOptions = {}): Promise<void> {
   await Deno.writeTextFile("data/klines.json", JSON.stringify(output, null, 2));
   console.log("Done!");
 }
-
-if (import.meta.main) {
-  await downloadData();
-}
