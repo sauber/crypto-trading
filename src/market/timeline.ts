@@ -1,14 +1,14 @@
-import { getData } from "./data.ts";
+import { getData } from "./market.ts";
 
-/** Convert between bar indices and wall-clock Date objects using the first coin's timestamp series. */
+/** Convert between tick indices and wall-clock Date objects using the first coin's timestamp series. */
 export interface Timeline {
-  /** Return the bar index whose timestamp is nearest to (>=) the given date. */
-  toBar(date: Date): number;
-  /** Return the Date of the given bar index. */
-  toDate(bar: number): Date;
+  /** Return the tick index whose timestamp is nearest to (>=) the given date. */
+  toTick(date: Date): number;
+  /** Return the Date of the given tick index. */
+  toDate(tick: number): Date;
 }
 
-/** Load cached klines and build a Timeline converter keyed on the first coin's bar timestamps. */
+/** Load cached klines and build a Timeline converter keyed on the first coin's tick timestamps. */
 export async function timeline(): Promise<Timeline> {
   const { klines, coins } = await getData();
 
@@ -19,8 +19,8 @@ export async function timeline(): Promise<Timeline> {
   const timestamps = new Float64Array(ref.map((b) => b.timestamp));
 
   return {
-    toBar(date: Date): number {
-      // Binary search for the bar matching the date
+    toTick(date: Date): number {
+      // Binary search for the tick matching the date
       const ts = date.getTime();
       let lo = 0;
       let hi = timestamps.length - 1;
@@ -31,8 +31,8 @@ export async function timeline(): Promise<Timeline> {
       }
       return lo;
     },
-    toDate(bar: number): Date {
-      return new Date(timestamps[bar] ?? 0);
+    toDate(tick: number): Date {
+      return new Date(timestamps[tick] ?? 0);
     },
   };
 }

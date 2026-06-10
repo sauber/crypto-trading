@@ -37,19 +37,27 @@ export { RsiTimed } from "./rsi-timed.ts";
 
 ## Naming
 
-- Files: kebab-case (`rsi-timed.ts`, `rank-trend.ts`)
+- Module files: single word (`download.ts`, `market.ts`, `timeline.ts`, `indicators.ts`)
+- Script files: verb-noun with hyphen (`download-data.ts`, `backtest-strategy.ts`, `list-coins.ts`)
 - Names: kebab-case (`rsi-timed`, `macd-timed`)
 - Classes/interfaces: PascalCase
+
+## Console separation
+
+- **Modules** must NOT write to `console.*` or `process.stdout`. Logic only.
+- **Scripts** handle all console output, file I/O, and error display.
+- Modules that need progress reporting accept an `onProgress` callback parameter.
+
 ## Entry-point scripts
 
 CLI entry points that wrap a module's functionality live inside that module's directory.
-Each file describes its action with a `<verb>_<noun>.ts` name:
+Each file describes its action with a `<verb>-<noun>.ts` name (hyphenated):
 
 ```
-src/market/download_data_cli.ts
-src/backtest/backtest_strategy.ts
-src/optimize/optimize_parameters.ts
-src/trade/trade_account.ts
+src/market/download-data.ts
+src/backtest/backtest-strategy.ts
+src/optimize/optimize-parameters.ts
+src/trade/trade-account.ts
 ```
 
 Tasks in `deno.json` reference these scripts by their full path.
@@ -72,4 +80,4 @@ Scripts must NOT contain:
 - loops (`for`, `while`, `do...while`)
 - branching (`if`/`else`/`switch`/ternary)
 
-All logic lives in imported modules. Callbacks are defined in their own module files, not inline.
+All logic lives in imported modules. Callbacks are passed inline (they are short and capture script scope for display purposes only).

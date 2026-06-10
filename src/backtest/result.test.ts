@@ -39,7 +39,7 @@ Deno.test("formats report", () => {
 Deno.test("collects trades", () => {
   const tl = {
     toDate: () => new Date("2024-01-01"),
-    toBar: () => 0,
+    toTick: () => 0,
   };
   const strategy = (() => {}) as never;
   (strategy as Record<string, unknown>).reasonLog = [];

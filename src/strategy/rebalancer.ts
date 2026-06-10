@@ -10,11 +10,13 @@ export function rebalancer(targetPositions: number): Strategy {
 
     for (const pos of portfolio.positions) {
       const inst = pos.instrument as RankedInstrument;
-      if (inst.rankChange(tick) < 0) {
+      const rc = inst.rankChange(tick);
+      const pc = tick >= 1 ? inst.price(tick) - inst.price(tick - 1) : 0;
+      if (rc < 0 && pc < 0) {
         reasonLog.push({
           tick,
           symbol: inst.symbol,
-          reason: `rank ${inst.rankChange(tick)} (#${inst.rank(tick)})`,
+          reason: `rank ${rc} (#${inst.rank(tick)}) price ${pc.toFixed(2)}`,
           type: "sell",
         });
         orders.push({ position: pos, reason: "Close" } as SellOrder);
@@ -29,10 +31,13 @@ export function rebalancer(targetPositions: number): Strategy {
     const heldSymbols = new Set(portfolio.positions.map((p) => p.instrument.symbol));
 
     const candidates = instruments
-      .filter((inst) =>
-        !heldSymbols.has(inst.symbol) &&
-        (inst as RankedInstrument).rankChange(tick) > 0
-      )
+      .filter((inst) => {
+        if (tick < 1 || heldSymbols.has(inst.symbol)) return false;
+        const ri = inst as RankedInstrument;
+        const rc = ri.rankChange(tick);
+        const pc = inst.price(tick) - inst.price(tick - 1);
+        return rc > 0 && pc > 0;
+      })
       .sort(
         (a, b) =>
           (b as RankedInstrument).rankChange(tick) -
@@ -40,13 +45,14 @@ export function rebalancer(targetPositions: number): Strategy {
       )
       .slice(0, remainingSlots);
 
-    const spendPerBuy = cash / candidates.length;
+    const spendPerBuy = cash / Math.max(1, candidates.length);
     for (const inst of candidates) {
       const ri = inst as RankedInstrument;
+      const pc = inst.price(tick) - inst.price(tick - 1);
       reasonLog.push({
         tick,
         symbol: ri.symbol,
-        reason: `rank +${ri.rankChange(tick)} (#${ri.rank(tick)})`,
+        reason: `rank +${ri.rankChange(tick)} (#${ri.rank(tick)}) price +${pc.toFixed(2)}`,
         type: "buy",
       });
       orders.push({ instrument: inst, amount: spendPerBuy } as BuyOrder);

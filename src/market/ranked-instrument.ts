@@ -31,9 +31,9 @@ export class RankedInstrument extends Instrument {
     return this.rankSeries[tick];
   }
 
-  /** Change in rank from previous tick (positive = gaining rank). Returns 0 at tick 0 or if out of range. */
+  /** Change in rank from previous tick (positive = rank improving). Returns NaN at tick 0 or if out of range. */
   rankChange(tick: number): number {
-    if (tick < 1 || tick >= this.length) return 0;
+    if (tick < 1 || tick >= this.length) return NaN;
     return this.rankChangeSeries[tick];
   }
 }

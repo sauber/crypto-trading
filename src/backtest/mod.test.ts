@@ -1,6 +1,6 @@
 import { assertEquals, assert } from "@std/assert";
 import { backtest, loadMarket } from "./mod.ts";
-import { _setTestData, _resetCache } from "../market/data.ts";
+import { _setTestData, _resetCache } from "../market/market.ts";
 import type { Kline } from "../kucoin/mod.ts";
 
 Deno.test("loads market", async () => {
@@ -31,7 +31,7 @@ Deno.test("backtest runs", () => {
   });
   const tl = {
     toDate: () => new Date(),
-    toBar: () => 0,
+    toTick: () => 0,
   };
 
   // Minimal strategy that does nothing
