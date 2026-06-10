@@ -18,5 +18,5 @@ const result = new BOHB(specs, config, evaluate).run(optimizeProgressCallback);
 displayBestConfig(result);
 
 const content = generateConfigContent(strategyName, result.bestConfig);
-await Deno.writeTextFile("src/config.ts", content);
-console.log("\nConfig written to src/config.ts");
+await Deno.writeTextFile("data/config.json", content);
+console.log("\nConfig written to data/config.json");

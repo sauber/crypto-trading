@@ -1,48 +1,32 @@
 import { assertEquals, assert, assertThrows } from "@std/assert";
-import { compactify, generateConfigContent, optimizeProgressCallback, displayBestConfig } from "../optimize/optimize_cli.ts";
+import { generateConfigContent, optimizeProgressCallback, displayBestConfig } from "../optimize/optimize_cli.ts";
 import { createParamEvaluator, evaluateParams } from "./evaluator.ts";
 import type { ParamSpec, BOHBProgress, BOHBResult } from "../hyperband/mod.ts";
 
-Deno.test("compactify returns integer as string", () => {
-  assertEquals(compactify(42), "42");
-});
-
-Deno.test("compactify returns float with two decimals", () => {
-  assertEquals(compactify(3.14159), "3.14");
-});
-
-Deno.test("compactify returns string value quoted", () => {
-  assertEquals(compactify("high"), `"high"`);
-});
-
-Deno.test("compactify returns zero correctly", () => {
-  assertEquals(compactify(0), "0");
-});
-
-Deno.test("compactify returns negative integer", () => {
-  assertEquals(compactify(-5), "-5");
-});
-
-Deno.test("generateConfigContent produces valid config output", () => {
+Deno.test("generateConfigContent produces valid JSON config", () => {
   const content = generateConfigContent("rsi-timed", { targetPositions: 5, rsiPeriod: 14 });
-  assert(content.includes('name: "rsi-timed"'));
-  assert(content.includes("targetPositions: 5"));
-  assert(content.includes("rsiPeriod: 14"));
-  assert(content.includes("export const CONFIG = {"));
-  assert(content.includes("initialCapital: 1000"));
-  assert(content.includes("fee: 0.001"));
-  assert(content.includes("reserveSymbol: \"USDC\""));
-  assert(content.includes("candleInterval: \"1hour\""));
+  const parsed = JSON.parse(content);
+  assertEquals(parsed.strategy.name, "rsi-timed");
+  assertEquals(parsed.strategy.params.rsiPeriod, 14);
+  assertEquals(parsed.targetPositions, 5);
+  assertEquals(parsed.initialCapital, 1000);
+  assertEquals(parsed.fee, 0.001);
+  assertEquals(parsed.reserveSymbol, "USDC");
+  assertEquals(parsed.candleInterval, "1hour");
+  assertEquals(parsed.candleLookback, 55);
+  assertEquals(parsed.cycleIntervalMs, 3600000);
 });
 
 Deno.test("generateConfigContent handles enum string values", () => {
   const content = generateConfigContent("test", { mode: "high" });
-  assert(content.includes('mode: "high"'));
+  const parsed = JSON.parse(content);
+  assertEquals(parsed.strategy.params.mode, "high");
 });
 
 Deno.test("generateConfigContent defaults targetPositions when missing", () => {
   const content = generateConfigContent("test", {});
-  assert(content.includes("targetPositions: 5"));
+  const parsed = JSON.parse(content);
+  assertEquals(parsed.targetPositions, 5);
 });
 
 Deno.test("evaluate params", () => {

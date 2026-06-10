@@ -17,7 +17,7 @@ function mockKline(close: number): Kline {
 const config = {
   reserveSymbol: "USDC",
   candleInterval: "1hour",
-  candleRangeMs: 55 * 3600000,
+  candleLookback: 55,
 };
 
 Deno.test("loads positions", async () => {

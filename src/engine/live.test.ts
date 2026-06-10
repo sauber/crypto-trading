@@ -9,7 +9,7 @@ Deno.test("constructs engine", () => {
     intervalMs: 3600000,
     targetPositions: 5,
     candleInterval: "1hour",
-    candleRangeMs: 3600000 * 55,
+    candleLookback: 55,
     reserveSymbol: "USDC",
   });
   assertEquals(engine instanceof TradingEngine, true);

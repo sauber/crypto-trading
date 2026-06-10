@@ -2,6 +2,7 @@ import { Portfolio, OpenPosition, type Strategy, type BuyOrder, type SellOrder, 
 import { KucoinClient } from "../kucoin/mod.ts";
 import { RankedInstrument } from "../market/ranked-instrument.ts";
 import type { Kline } from "../kucoin/mod.ts";
+import { intervalToMs } from "./interval.ts";
 
 type Order = BuyOrder | SellOrder;
 
@@ -11,7 +12,7 @@ export interface LiveEngineConfig {
   intervalMs: number;
   targetPositions: number;
   candleInterval: string;
-  candleRangeMs: number;
+  candleLookback: number;
   reserveSymbol: string;
 }
 
@@ -68,8 +69,9 @@ export class TradingEngine {
 
   private async cycle(): Promise<void> {
     this.cycleCount++;
-    const { client, strategy, candleInterval, candleRangeMs, reserveSymbol } =
+    const { client, strategy, candleInterval, candleLookback, reserveSymbol } =
       this.config;
+    const candleRangeMs = candleLookback * intervalToMs(candleInterval);
 
     console.log(`\n=== Cycle ${this.cycleCount} ===`);
 

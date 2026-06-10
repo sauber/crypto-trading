@@ -3,25 +3,25 @@ import { KucoinClient } from "../kucoin/mod.ts";
 import { TradingEngine } from "../engine/live.ts";
 import type { LiveEngineConfig } from "../engine/live.ts";
 import { strategyRegistry } from "../registry/registration.ts";
-import { CONFIG } from "../config.ts";
+import config from "../../data/config.json" with { type: "json" };
 
 const { apiKey, apiSecret, apiPassphrase } = getKucoinCredentials();
 const client = new KucoinClient({ apiKey, apiSecret, apiPassphrase });
 const strategy = strategyRegistry
-  .get(CONFIG.strategy.name)
-  .create(CONFIG.strategy.params);
+  .get(config.strategy.name)
+  .create(config.strategy.params);
 const engineConfig: LiveEngineConfig = {
   client,
   strategy,
-  intervalMs: CONFIG.cycleIntervalMs,
-  targetPositions: CONFIG.targetPositions,
-  candleInterval: CONFIG.candleInterval,
-  candleRangeMs: CONFIG.candleRangeMs,
-  reserveSymbol: CONFIG.reserveSymbol,
+  intervalMs: config.cycleIntervalMs,
+  targetPositions: config.targetPositions,
+  candleInterval: config.candleInterval,
+  candleLookback: config.candleLookback,
+  reserveSymbol: config.reserveSymbol,
 };
 
-console.log(`strategy=${CONFIG.strategy.name}`);
-console.log(`targetPositions=${CONFIG.targetPositions}`);
+console.log(`strategy=${config.strategy.name}`);
+console.log(`targetPositions=${config.targetPositions}`);
 
 const engine = new TradingEngine(engineConfig);
 await engine.start();

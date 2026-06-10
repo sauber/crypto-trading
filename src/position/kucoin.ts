@@ -1,12 +1,14 @@
 import type { PositionLoader } from "./types.ts";
 import type { PositionState } from "../engine/types.ts";
 import type { KucoinClient } from "../kucoin/mod.ts";
+import { intervalToMs } from "../engine/interval.ts";
 
 export function KucoinPositionLoader(
-  config: { reserveSymbol: string; candleInterval: string; candleRangeMs: number },
+  config: { reserveSymbol: string; candleInterval: string; candleLookback: number },
   client: KucoinClient,
 ): PositionLoader {
-  const { reserveSymbol, candleInterval, candleRangeMs } = config;
+  const { reserveSymbol, candleInterval, candleLookback } = config;
+  const candleRangeMs = candleLookback * intervalToMs(candleInterval);
 
   const strategy = async (): Promise<PositionState[]> => {
     const balances = await client.getBalances();

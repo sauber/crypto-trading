@@ -4,12 +4,12 @@ import type { PositionState } from "../engine/types.ts";
 export function BlankPositionLoader(config?: {
   reserveSymbol?: string;
   candleInterval?: string;
-  candleRangeMs?: number;
+  candleLookback?: number;
 }): PositionLoader {
   const _config = {
     reserveSymbol: "USDC",
     candleInterval: "1hour",
-    candleRangeMs: 55 * 3600000,
+    candleLookback: 55,
     ...config,
   };
 
