@@ -1,7 +1,7 @@
 export interface KucoinConfig {
-  apiKey: string;
-  apiSecret: string;
-  apiPassphrase: string;
+  apiKey?: string;
+  apiSecret?: string;
+  apiPassphrase?: string;
   apiUrl?: string;
 }
 

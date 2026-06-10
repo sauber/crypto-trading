@@ -30,10 +30,14 @@ export class KucoinClient {
       .setMaxIdleConns(10)
       .build();
 
+    const key = this.config.apiKey ?? "";
+    const secret = this.config.apiSecret ?? "";
+    const passphrase = this.config.apiPassphrase ?? "";
+
     const options = new ClientOptionBuilder()
-      .setKey(this.config.apiKey)
-      .setSecret(this.config.apiSecret)
-      .setPassphrase(this.config.apiPassphrase)
+      .setKey(key)
+      .setSecret(secret)
+      .setPassphrase(passphrase)
       .setSpotEndpoint(this.config.apiUrl ?? sdk.GlobalApiEndpoint)
       .setTransportOption(transport)
       .build();
@@ -107,28 +111,26 @@ export class KucoinClient {
     }));
   }
 
+  async getAllTickers(): Promise<LiquidityRanking[]> {
+    const baseUrl = this.config.apiUrl ?? "https://api.kucoin.com";
+    const resp = await fetch(`${baseUrl}/api/v1/market/allTickers`);
+    const json = await resp.json();
+    const tickers: LiquidityRanking[] = (json.data.ticker ?? [])
+      .filter((t: any) => t.symbol.endsWith("-USDT"))
+      .map((t: any) => ({
+        symbol: t.symbol,
+        volume24h: parseFloat(t.volValue ?? "0"),
+        lastPrice: parseFloat(t.last ?? "0"),
+        changeRate: parseFloat(t.changeRate ?? "0"),
+      }))
+      .filter((t: LiquidityRanking) => t.volume24h > 0);
+    return tickers;
+  }
+
   async getTopVolumeSymbols(limit: number = 20): Promise<LiquidityRanking[]> {
-    await this.#ensureClient();
-    const sdk = await getSDK();
-    const api = (this.client as any).restService().getSpotService().getMarketApi();
-    const req = (sdk.Spot as any).Market.GetAllSymbolsReq.builder().build();
-    const resp = await api.getAllSymbols(req);
-    const usdtPairs = resp.data.filter((s: any) => s.symbol.endsWith("-USDT"));
-
-    const tickers = await Promise.all(
-      usdtPairs.slice(0, 50).map(async (s: any) => {
-        try {
-          const ticker = await this.getTicker(s.symbol);
-          return { symbol: s.symbol, volume24h: ticker.volValue, lastPrice: ticker.last, changeRate: ticker.changeRate };
-        } catch {
-          return null;
-        }
-      }),
-    );
-
+    const tickers = await this.getAllTickers();
     return tickers
-      .filter((t: any): t is LiquidityRanking => t !== null && t.volume24h > 0)
-      .sort((a: any, b: any) => b.volume24h - a.volume24h)
+      .sort((a, b) => b.volume24h - a.volume24h)
       .slice(0, limit);
   }
 

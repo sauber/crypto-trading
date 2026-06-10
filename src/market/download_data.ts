@@ -14,16 +14,7 @@ export async function downloadData(opts: DownloadOptions = {}): Promise<void> {
 
   const { KucoinClient } = await import("../kucoin/client.ts");
 
-  // Read KuCoin API credentials from environment
-  const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";
-  const KUCOIN_API_SECRET = Deno.env.get("KUCOIN_API_SECRET") || "";
-  const KUCOIN_API_PASSPHRASE = Deno.env.get("KUCOIN_API_PASSPHRASE") || "";
-
-  const client = new KucoinClient({
-    apiKey: KUCOIN_API_KEY,
-    apiSecret: KUCOIN_API_SECRET,
-    apiPassphrase: KUCOIN_API_PASSPHRASE,
-  });
+  const client = new KucoinClient({});
 
   // Determine time range: 90 days back from now
   const now = Date.now();
