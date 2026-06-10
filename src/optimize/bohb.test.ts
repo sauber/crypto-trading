@@ -1,4 +1,4 @@
-import { assertEquals, assert } from "@std/assert";
+import { assertEquals, assert, assertThrows } from "@std/assert";
 import { BOHB, BOHBAsync } from "./bohb.ts";
 import type { ParamSpec } from "./types.ts";
 
@@ -6,15 +6,6 @@ import type { ParamSpec } from "./types.ts";
 
 const stubAsyncEval = () => Promise.resolve(0);
 const stubSyncEval = () => 0;
-
-function assertThrows(fn: () => void, msg?: string): void {
-  try {
-    fn();
-    throw new Error(msg ?? "expected throw");
-  } catch (e) {
-    if ((e as Error).message === (msg ?? "expected throw")) throw e;
-  }
-}
 
 // ---- BOHBAsync tests ----
 

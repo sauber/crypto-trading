@@ -1,3 +1,4 @@
+import { assertEquals, assert } from "@std/assert";
 import { KucoinPositionLoader } from "./kucoin.ts";
 import type { KucoinClient, Balance, Ticker, Kline } from "../kucoin/mod.ts";
 
@@ -19,7 +20,7 @@ const config = {
   candleRangeMs: 55 * 3600000,
 };
 
-Deno.test("KucoinPositionLoader returns positions from getBalances", async () => {
+Deno.test("loads positions", async () => {
   let getBalancesCalled = false;
   let getTickerCalled = false;
 
@@ -37,15 +38,15 @@ Deno.test("KucoinPositionLoader returns positions from getBalances", async () =>
   const loader = KucoinPositionLoader(config, client);
   const result = await loader();
 
-  if (!getBalancesCalled) throw new Error("getBalances was not called");
-  if (!getTickerCalled) throw new Error("getTicker was not called");
-  if (result.length !== 1) throw new Error(`expected 1 position, got ${result.length}`);
-  if (result[0].symbol !== "BTC-USDT") throw new Error(`expected BTC-USDT, got ${result[0].symbol}`);
-  if (result[0].size !== 0.5) throw new Error(`expected size 0.5, got ${result[0].size}`);
-  if (result[0].entryPrice !== 60000) throw new Error(`expected price 60000, got ${result[0].entryPrice}`);
+  assert(getBalancesCalled);
+  assert(getTickerCalled);
+  assertEquals(result.length, 1);
+  assertEquals(result[0].symbol, "BTC-USDT");
+  assertEquals(result[0].size, 0.5);
+  assertEquals(result[0].entryPrice, 60000);
 });
 
-Deno.test("KucoinPositionLoader filters reserve symbol", async () => {
+Deno.test("filters reserve", async () => {
   const client = {
     getBalances: () =>
       Promise.resolve([
@@ -62,21 +63,21 @@ Deno.test("KucoinPositionLoader filters reserve symbol", async () => {
   const loader = KucoinPositionLoader(config, client);
   const result = await loader();
 
-  if (result.length !== 2) throw new Error(`expected 2 positions (no USDC), got ${result.length}`);
-  if (result.some((p) => p.symbol === "USDC-USDT")) throw new Error("USDC should be filtered out");
+  assertEquals(result.length, 2);
+  assertEquals(result.some((p) => p.symbol === "USDC-USDT"), false);
 });
 
-Deno.test("KucoinPositionLoader returns empty for no active balances", async () => {
+Deno.test("empty balances", async () => {
   const client = {
     getBalances: () => Promise.resolve([]),
   } as unknown as KucoinClient;
 
   const loader = KucoinPositionLoader(config, client);
   const result = await loader();
-  if (result.length !== 0) throw new Error("expected empty array");
+  assertEquals(result.length, 0);
 });
 
-Deno.test("KucoinPositionLoader falls back to klines when ticker fails", async () => {
+Deno.test("ticker fallback", async () => {
   let getKlinesCalled = false;
 
   const client = {
@@ -91,12 +92,12 @@ Deno.test("KucoinPositionLoader falls back to klines when ticker fails", async (
   const loader = KucoinPositionLoader(config, client);
   const result = await loader();
 
-  if (!getKlinesCalled) throw new Error("getKlines fallback was not called");
-  if (result.length !== 1) throw new Error(`expected 1 position, got ${result.length}`);
-  if (result[0].entryPrice !== 55000) throw new Error(`expected price 55000 from klines, got ${result[0].entryPrice}`);
+  assert(getKlinesCalled);
+  assertEquals(result.length, 1);
+  assertEquals(result[0].entryPrice, 55000);
 });
 
-Deno.test("KucoinPositionLoader skips coins that fail both ticker and klines", async () => {
+Deno.test("skips failed", async () => {
   const client = {
     getBalances: () =>
       Promise.resolve([mockBalance("BTC", "1"), mockBalance("ETH", "2")]),
@@ -110,6 +111,6 @@ Deno.test("KucoinPositionLoader skips coins that fail both ticker and klines", a
   const loader = KucoinPositionLoader(config, client);
   const result = await loader();
 
-  if (result.length !== 1) throw new Error(`expected 1 position (only ETH), got ${result.length}`);
-  if (result[0].symbol !== "ETH-USDT") throw new Error(`expected ETH-USDT, got ${result[0].symbol}`);
+  assertEquals(result.length, 1);
+  assertEquals(result[0].symbol, "ETH-USDT");
 });

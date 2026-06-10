@@ -1,6 +1,3 @@
-import { KucoinClient } from "../kucoin/client.ts";
-
-/** Tunables for the kline download. All fields optional with sensible defaults. */
 export interface DownloadOptions {
   topN?: number;
   daysBack?: number;
@@ -14,6 +11,8 @@ export async function downloadData(opts: DownloadOptions = {}): Promise<void> {
     daysBack = 90,
     interval = "1hour",
   } = opts;
+
+  const { KucoinClient } = await import("../kucoin/client.ts");
 
   // Read KuCoin API credentials from environment
   const KUCOIN_API_KEY = Deno.env.get("KUCOIN_API_KEY") || "";

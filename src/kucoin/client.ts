@@ -1,18 +1,29 @@
-import {
-  ClientOptionBuilder,
-  DefaultClient,
-  GlobalApiEndpoint,
-  Spot,
-  Account,
-  TransportOptionBuilder,
-} from "kucoin-universal-sdk";
-
 import type { KucoinConfig, Balance, Ticker, Kline, OrderRequest, OrderResult, LiquidityRanking } from "./types.ts";
 
+let _sdk: Record<string, unknown> | null = null;
+
+async function getSDK(): Promise<Record<string, unknown>> {
+  if (!_sdk) {
+    _sdk = await import("kucoin-universal-sdk");
+  }
+  return _sdk;
+}
+
 export class KucoinClient {
-  private client: DefaultClient;
+  private client: unknown = null;
+  private config: KucoinConfig;
 
   constructor(config: KucoinConfig) {
+    this.config = config;
+  }
+
+  async #ensureClient(): Promise<void> {
+    if (this.client) return;
+    const sdk = await getSDK();
+    const TransportOptionBuilder = sdk.TransportOptionBuilder as any;
+    const ClientOptionBuilder = sdk.ClientOptionBuilder as any;
+    const DefaultClient = sdk.DefaultClient as any;
+
     const transport = new TransportOptionBuilder()
       .setKeepAlive(true)
       .setMaxConnsPerHost(10)
@@ -20,10 +31,10 @@ export class KucoinClient {
       .build();
 
     const options = new ClientOptionBuilder()
-      .setKey(config.apiKey)
-      .setSecret(config.apiSecret)
-      .setPassphrase(config.apiPassphrase)
-      .setSpotEndpoint(config.apiUrl ?? GlobalApiEndpoint)
+      .setKey(this.config.apiKey)
+      .setSecret(this.config.apiSecret)
+      .setPassphrase(this.config.apiPassphrase)
+      .setSpotEndpoint(this.config.apiUrl ?? sdk.GlobalApiEndpoint)
       .setTransportOption(transport)
       .build();
 
@@ -31,14 +42,16 @@ export class KucoinClient {
   }
 
   async getBalances(): Promise<Balance[]> {
-    const api = this.client.restService().getAccountService().getAccountApi();
-    const req = Account.Account.GetSpotAccountListReq.builder().build();
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getAccountService().getAccountApi();
+    const req = (sdk.Account as any).Account.GetSpotAccountListReq.builder().build();
     const resp = await api.getSpotAccountList(req);
     return resp.data.map((a: any) => ({
       currency: a.currency,
       available: a.available,
       frozen: a.frozen,
-      total: a.total,
+      total: a.balance,
       accountType: a.type,
     }));
   }
@@ -49,8 +62,10 @@ export class KucoinClient {
   }
 
   async getTicker(symbol: string): Promise<Ticker> {
-    const api = this.client.restService().getSpotService().getMarketApi();
-    const req = Spot.Market.Get24hrStatsReq.builder().setSymbol(symbol).build();
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getSpotService().getMarketApi();
+    const req = (sdk.Spot as any).Market.Get24hrStatsReq.builder().setSymbol(symbol).build();
     const resp = await api.get24hrStats(req);
     return {
       symbol,
@@ -70,10 +85,12 @@ export class KucoinClient {
     startAt: number,
     endAt: number,
   ): Promise<Kline[]> {
-    const api = this.client.restService().getSpotService().getMarketApi();
-    const req = Spot.Market.GetKlinesReq.builder()
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getSpotService().getMarketApi();
+    const req = (sdk.Spot as any).Market.GetKlinesReq.builder()
       .setSymbol(symbol)
-      .setType(interval as any)
+      .setType(interval)
       .setStartAt(Math.floor(startAt / 1000))
       .setEndAt(Math.floor(endAt / 1000))
       .build();
@@ -91,8 +108,10 @@ export class KucoinClient {
   }
 
   async getTopVolumeSymbols(limit: number = 20): Promise<LiquidityRanking[]> {
-    const api = this.client.restService().getSpotService().getMarketApi();
-    const req = Spot.Market.GetAllSymbolsReq.builder().build();
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getSpotService().getMarketApi();
+    const req = (sdk.Spot as any).Market.GetAllSymbolsReq.builder().build();
     const resp = await api.getAllSymbols(req);
     const usdtPairs = resp.data.filter((s: any) => s.symbol.endsWith("-USDT"));
 
@@ -108,25 +127,27 @@ export class KucoinClient {
     );
 
     return tickers
-      .filter((t): t is LiquidityRanking => t !== null && t.volume24h > 0)
-      .sort((a, b) => b.volume24h - a.volume24h)
+      .filter((t: any): t is LiquidityRanking => t !== null && t.volume24h > 0)
+      .sort((a: any, b: any) => b.volume24h - a.volume24h)
       .slice(0, limit);
   }
 
   async placeOrder(req: OrderRequest): Promise<OrderResult> {
-    const api = this.client.restService().getSpotService().getOrderApi();
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getSpotService().getOrderApi();
     const side = req.side === "buy"
-      ? Spot.Order.AddOrderSyncReq.SideEnum.BUY
-      : Spot.Order.AddOrderSyncReq.SideEnum.SELL;
+      ? (sdk.Spot as any).Order.AddOrderSyncReq.SideEnum.BUY
+      : (sdk.Spot as any).Order.AddOrderSyncReq.SideEnum.SELL;
 
-    const builder = Spot.Order.AddOrderSyncReq.builder()
+    const builder = (sdk.Spot as any).Order.AddOrderSyncReq.builder()
       .setClientOid(crypto.randomUUID())
       .setSide(side)
       .setSymbol(req.symbol)
       .setType(
         req.type === "limit"
-          ? Spot.Order.AddOrderSyncReq.TypeEnum.LIMIT
-          : Spot.Order.AddOrderSyncReq.TypeEnum.MARKET,
+          ? (sdk.Spot as any).Order.AddOrderSyncReq.TypeEnum.LIMIT
+          : (sdk.Spot as any).Order.AddOrderSyncReq.TypeEnum.MARKET,
       )
       .setSize(req.size);
 
@@ -137,14 +158,18 @@ export class KucoinClient {
   }
 
   async cancelAllOrders(symbol: string): Promise<void> {
-    const api = this.client.restService().getSpotService().getOrderApi();
-    const req = Spot.Order.CancelAllOrdersBySymbolReq.builder().setSymbol(symbol).build();
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getSpotService().getOrderApi();
+    const req = (sdk.Spot as any).Order.CancelAllOrdersBySymbolReq.builder().build();
     await api.cancelAllOrdersBySymbol(req);
   }
 
   async getOpenOrders(symbol: string): Promise<any[]> {
-    const api = this.client.restService().getSpotService().getOrderApi();
-    const req = Spot.Order.GetOpenOrdersReq.builder().setSymbol(symbol).build();
+    await this.#ensureClient();
+    const sdk = await getSDK();
+    const api = (this.client as any).restService().getSpotService().getOrderApi();
+    const req = (sdk.Spot as any).Order.GetOpenOrdersReq.builder().build();
     const resp = await api.getOpenOrders(req);
     return resp.data;
   }

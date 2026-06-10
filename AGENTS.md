@@ -30,7 +30,7 @@ deno task backtest              # Run pipeline backtest
 deno task optimize              # BOHB parameter optimization
 deno task trade                 # Live trading (dry-run with DRY_RUN=true)
 deno check src/                 # Type-check entire project
-deno test --allow-read --allow-env  # Run tests
+deno task test                      # Run tests
 ```
 
 ## Environment

@@ -20,12 +20,11 @@ description: Modern Deno practices — imports, TypeScript, standard library, an
 ## Standardbibliotek (std)
 
 - `@std/assert` — test assertions
-- `@std/testing` — mocking, snapshot, bdd
 - `@std/fs` — filsystem (walk, exists, move)
 - `@std/path` — path manipulation
 - `@std/dotenv` — `.env` load
 
-## Proces & tooling
+## Process & tooling
 
 | Tool | Usage |
 |---------|------|
@@ -54,3 +53,12 @@ dev_deps.ts           # Bundled dev-dependencies (optional)
 - Name test files `{name}.test.ts` — Deno discovers automatically
 - Use `export default` sparingly — prefer named exports
 - `const` over `let` unless rebinding is necessary
+
+## Testing
+
+- Test names are **two words**: `Deno.test("quoted value", ...)` — not `"compactify returns string value quoted"`
+- Always use `@std/assert`: `assertEquals`, `assertExists`, `assertThrows`, `assertRejects`, `assertStringIncludes`, etc. Never `throw new Error(...)` or `try {} catch {}` in tests — use `assertThrows` for sync errors, `assertRejects` for async errors
+- Each exported class or exported function gets at least one focused test case
+- Test files placed alongside implementation: `src/<module>/<file>.test.ts`
+- Mock data defined inline — no file I/O, no external fixtures
+- Run with `deno task test`

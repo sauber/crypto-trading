@@ -1,9 +1,8 @@
+import { assertEquals } from "@std/assert";
 import { BlankPositionLoader } from "./blank.ts";
 
-Deno.test("BlankPositionLoader returns empty array", async () => {
+Deno.test("empty positions", async () => {
   const loader = BlankPositionLoader();
   const positions = await loader();
-  if (positions.length !== 0) {
-    throw new Error(`expected [], got ${positions.length} positions`);
-  }
+  assertEquals(positions.length, 0);
 });

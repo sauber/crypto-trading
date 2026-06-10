@@ -1,6 +1,6 @@
-import { assertEquals, assert } from "@std/assert";
+import { assertEquals, assert, assertThrows } from "@std/assert";
 import { compactify, generateConfigContent, optimizeProgressCallback, displayBestConfig } from "../optimize/optimize_cli.ts";
-import { createParamEvaluator } from "./evaluator.ts";
+import { createParamEvaluator, evaluateParams } from "./evaluator.ts";
 import type { ParamSpec, BOHBProgress, BOHBResult } from "../optimize/types.ts";
 
 Deno.test("compactify returns integer as string", () => {
@@ -43,6 +43,13 @@ Deno.test("generateConfigContent handles enum string values", () => {
 Deno.test("generateConfigContent defaults targetPositions when missing", () => {
   const content = generateConfigContent("test", {});
   assert(content.includes("targetPositions: 5"));
+});
+
+Deno.test("evaluate params", () => {
+  const specs: ParamSpec[] = [{ key: "x", type: "decimal", lo: 0, hi: 10, precision: 0 }];
+  const marketObj = {} as never;
+  const tl = {} as never;
+  assertThrows(() => evaluateParams([5], specs, marketObj, tl, "nonexistent"), Error, "nonexistent");
 });
 
 Deno.test("createParamEvaluator returns a function", () => {

@@ -1,3 +1,4 @@
+import { assertRejects } from "@std/assert";
 import { _setTestData, _resetCache, type DataCache } from "./data.ts";
 import { market } from "./market-data.ts";
 import { timeline } from "./timeline.ts";
@@ -118,12 +119,7 @@ Deno.test("market exposes raw klines on instrument", async () => {
 Deno.test("market throws when fewer than 2 bars", async () => {
   const klines = new Map([["X", [kline(1000, 10, 100)]]]);
   _setTestData({ klines, coins: ["X"] });
-  try {
-    await market();
-    throw new Error("expected market() to throw");
-  } catch (e) {
-    if (!(e instanceof Error) || !e.message.includes("at least 2 bars")) throw e;
-  }
+  await assertRejects(() => market(), Error, "at least 2 bars");
 });
 
 Deno.test("market handles symbols not in the coins list (zero-filled rank)", async () => {

@@ -1,3 +1,4 @@
+import { assertEquals, assert } from "@std/assert";
 import { KucoinDiscovery } from "./kucoin.ts";
 import type { KucoinClient, LiquidityRanking, Kline } from "../kucoin/mod.ts";
 
@@ -9,7 +10,7 @@ function mockKline(close: number, volume: number): Kline {
   return { timestamp: 1, open: close, high: close + 1, low: close - 1, close, volume };
 }
 
-Deno.test("KucoinDiscovery fetches from client.getTopVolumeSymbols", async () => {
+Deno.test("calls client", async () => {
   let called = false;
   const client = {
     getTopVolumeSymbols: (_limit: number) => {
@@ -22,27 +23,27 @@ Deno.test("KucoinDiscovery fetches from client.getTopVolumeSymbols", async () =>
 
   const d = KucoinDiscovery({ topN: 5 }, client);
   const result = await d();
-  if (!called) throw new Error("getTopVolumeSymbols was not called");
-  if (result.length !== 1) throw new Error(`expected 1, got ${result.length}`);
+  assert(called);
+  assertEquals(result.length, 1);
 });
 
-Deno.test("KucoinDiscovery computes liquidity from last kline", async () => {
+Deno.test("computes score", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("BTC-USDT"), mockRanking("ETH-USDT")]),
     getKlines: (sym: string) => {
-      if (sym === "BTC-USDT") return Promise.resolve([mockKline(100, 10)]);   // 1000
-      return Promise.resolve([mockKline(50, 20)]);                            // 1000
+      if (sym === "BTC-USDT") return Promise.resolve([mockKline(100, 10)]);
+      return Promise.resolve([mockKline(50, 20)]);
     },
   } as unknown as KucoinClient;
 
   const d = KucoinDiscovery({ topN: 5 }, client);
   const result = await d();
-  if (result[0].score !== 1000) throw new Error(`BTC score expected 1000, got ${result[0].score}`);
-  if (result[1].score !== 1000) throw new Error(`ETH score expected 1000, got ${result[1].score}`);
+  assertEquals(result[0].score, 1000);
+  assertEquals(result[1].score, 1000);
 });
 
-Deno.test("KucoinDiscovery respects topN config", async () => {
+Deno.test("respects limit", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("A"), mockRanking("B"), mockRanking("C")]),
@@ -51,26 +52,26 @@ Deno.test("KucoinDiscovery respects topN config", async () => {
 
   const d = KucoinDiscovery({ topN: 2 }, client);
   const result = await d();
-  if (result.length !== 2) throw new Error(`expected 2, got ${result.length}`);
+  assertEquals(result.length, 2);
 });
 
-Deno.test("KucoinDiscovery skips symbols with no klines", async () => {
+Deno.test("skips empty", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("A"), mockRanking("B"), mockRanking("C")]),
     getKlines: (sym: string) => {
-      if (sym === "B") return Promise.resolve([]);  // empty → skip
+      if (sym === "B") return Promise.resolve([]);
       return Promise.resolve([mockKline(100, 1)]);
     },
   } as unknown as KucoinClient;
 
   const d = KucoinDiscovery({ topN: 5 }, client);
   const result = await d();
-  if (result.length !== 2) throw new Error(`expected 2 (A and C), got ${result.length}`);
-  if (result.some((c: { symbol: string }) => c.symbol === "B")) throw new Error("B should be excluded");
+  assertEquals(result.length, 2);
+  assertEquals(result.some((c) => c.symbol === "B"), false);
 });
 
-Deno.test("KucoinDiscovery skips symbols when getKlines throws", async () => {
+Deno.test("skips error", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("A"), mockRanking("B")]),
@@ -82,22 +83,22 @@ Deno.test("KucoinDiscovery skips symbols when getKlines throws", async () => {
 
   const d = KucoinDiscovery({ topN: 5 }, client);
   const result = await d();
-  if (result.length !== 1) throw new Error(`expected 1 (only A), got ${result.length}`);
-  if (result[0].symbol !== "A") throw new Error(`expected A, got ${result[0].symbol}`);
+  assertEquals(result.length, 1);
+  assertEquals(result[0].symbol, "A");
 });
 
-Deno.test("KucoinDiscovery sorts descending by score", async () => {
+Deno.test("sorts score", async () => {
   const client = {
     getTopVolumeSymbols: () =>
       Promise.resolve([mockRanking("A"), mockRanking("B"), mockRanking("C")]),
     getKlines: (sym: string) => {
-      if (sym === "A") return Promise.resolve([mockKline(10, 10)]);   // 100
-      if (sym === "B") return Promise.resolve([mockKline(5, 100)]);   // 500
-      return Promise.resolve([mockKline(100, 1)]);                     // 100
+      if (sym === "A") return Promise.resolve([mockKline(10, 10)]);
+      if (sym === "B") return Promise.resolve([mockKline(5, 100)]);
+      return Promise.resolve([mockKline(100, 1)]);
     },
   } as unknown as KucoinClient;
 
   const d = KucoinDiscovery({ topN: 5 }, client);
   const result = await d();
-  if (result[0].symbol !== "B") throw new Error(`first should be B (500), got ${result[0].symbol}`);
+  assertEquals(result[0].symbol, "B");
 });

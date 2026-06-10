@@ -1,4 +1,4 @@
-import { assertEquals, assert } from "@std/assert";
+import { assertEquals, assert, assertThrows } from "@std/assert";
 import { DecimalParameter, EnumParameter, Parameter } from "./parameter.ts";
 import type { ParamSpec } from "./types.ts";
 
@@ -103,28 +103,13 @@ Deno.test("Parameter.fromSpec creates EnumParameter", () => {
 });
 
 Deno.test("DecimalParameter constructor rejects lo >= hi", () => {
-  try {
-    new DecimalParameter("x", 5, 5, 0);
-    throw new Error("should have thrown");
-  } catch (e) {
-    if ((e as Error).message === "should have thrown") throw e;
-  }
+  assertThrows(() => new DecimalParameter("x", 5, 5, 0));
 });
 
 Deno.test("DecimalParameter constructor rejects negative precision", () => {
-  try {
-    new DecimalParameter("x", 0, 10, -1);
-    throw new Error("should have thrown");
-  } catch (e) {
-    if ((e as Error).message === "should have thrown") throw e;
-  }
+  assertThrows(() => new DecimalParameter("x", 0, 10, -1));
 });
 
 Deno.test("EnumParameter constructor rejects single value", () => {
-  try {
-    new EnumParameter("x", ["only"]);
-    throw new Error("should have thrown");
-  } catch (e) {
-    if ((e as Error).message === "should have thrown") throw e;
-  }
+  assertThrows(() => new EnumParameter("x", ["only"]));
 });
