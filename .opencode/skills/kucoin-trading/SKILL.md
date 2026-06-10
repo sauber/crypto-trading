@@ -1,22 +1,22 @@
 ---
 name: kucoin-trading
-description: KuCoin crypto trading agent with 6-role pipeline architecture. TypeScript/Deno project. Use this skill when working with the trading agent's code, strategies or KuCoin API integration.
+description: KuCoin crypto trading agent pipeline architecture. TypeScript/Deno project. Use this skill when working with the trading agent's code, strategies or KuCoin API integration.
 ---
 
 ## Architecture (see AGENTS.md for details)
 
-6-role pipeline executed every trading cycle (1h):
+Pipeline stages executed every trading cycle (1h):
 
 ```
-Discovery → Portfolio → Trading → Execution → Reflection → Communication
+Discovery → Portfolio → Trading → Execution → Reflection → Logging
 ```
 
-- **Discovery**: Find top 20 USDT-pairs by 24h volume
+- **Discovery**: Find top USDT-pairs by 24h volume
 - **Portfolio**: Assess wanted/unwanted coins based on rank change; position sizing
 - **Trading**: Timing of swaps via technical indicators (RSI, MACD, BB, EMA+ADX)
-- **Execution**: Simulated (capital × (1-fee)) or live KuCoin market orders
-- **Reflection**: Collect decisions + outcomes, analyze success/failure (live only)
-- **Communication**: Report status — silent in backtest, verbose in live
+- **Execution**: Simulated or live KuCoin market orders
+- **Reflection**: Collect decisions + outcomes, analyze success/failure
+- **Logging**: Report status — silent in backtest, verbose in live
 
 ## Module structure
 
@@ -24,23 +24,25 @@ Flat top-level modules under `src/`:
 
 | Module | Contents |
 |--------|----------|
-| `engine/` | Pipeline simulate, live engine, shared types |
-| `discovery/` | Top-volume coin discovery (testdata, kucoin) |
-| `portfolio/` | Rank-trend portfolio strategy |
-| `trading/` | RSI, MACD, BB, EMA+ADX timed strategies |
-| `execution/` | Simulated + KuCoin execution |
-| `communication/` | Silent + verbose reporting |
-| `reflection/` | Noop + analyst reflection |
+| `engine/` | Pipeline types + live engine |
+| `discovery/` | Top-volume coin discovery |
+| `strategy/` | RSI, MACD, BB, EMA+ADX trading strategies + rebalancer |
+| `market/` | Market data loading, klines, timeline, ranked instruments |
+| `backtest/` | Backtest runner, result collection, evaluation |
+| `trade/` | Live trading entry point |
+| `execution/` | Execution stub (planned) |
 | `position/` | Blank + KuCoin portfolio loaders |
-| `registry/` | RoleRegistry + all strategy registrations |
+| `registry/` | RoleRegistry + strategy registration |
 | `kucoin/` | KuCoin REST API client + types |
+| `hyperband/` | Standalone BOHB optimization algorithm |
+| `optimize/` | Project-aware parameter optimizer |
 
 ## Key concepts
 
 - **Runtime**: Deno 2.7+, TypeScript, strict mode
 - **Exchange**: KuCoin via REST API (sub-account)
 - **Pipeline backtest**: Entire pipeline runs bar-by-bar (not per-strategy isolation)
-- **Optimization**: BOHB over (portfolio_strat × portfolio_params) × (trading_strat × trading_params)
+- **Optimization**: BOHB over strategy parameters
 - **Data**: `data/klines.json` downloaded by `deno task testdata` — no API calls during backtest/optimize
 - **SOLID**: Single Responsibility per module, Open/Closed via RoleRegistry, Dependency Inversion via interfaces
 
@@ -66,7 +68,7 @@ deno task test                  # Run tests
 
 ## Development notes
 
-- Each strategy is a single file in its component directory, config in `<name>.config.ts`
+- Each strategy is a single file in its component directory
 - Cross-module imports go through `mod.ts`; intra-module uses direct `./file.ts` paths
 - `import type` for type-only imports
 - Write tests BEFORE implementation (TDD)

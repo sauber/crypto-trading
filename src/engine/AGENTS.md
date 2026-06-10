@@ -6,30 +6,17 @@ Shared engine types and pipeline execution.
 
 | File | Purpose |
 |------|---------|
-| `types.ts` | `PositionState`, `PortfolioDecision`, `Swap`, `SwapPlan`, `PipelineResult`, `TradeRecord`, `ExecutionResult`, `SimData` |
-| `simulate.ts` | `pipelineSimulate()` — bar-by-bar backtest |
-| `live.ts` | `TradingEngine` — live loop with discovery/portfolio/trading/execution/reflection/logger |
-| `mod.ts` | Re-exports all engine types for cross-module consumers |
+| `types.ts` | `PositionState`, `ExecutionResult`, `TradeRecord` |
+| `live.ts` | `TradingEngine` — live loop with discovery/portfolio/trading/execution/reflection/logging |
+| `interval.ts` | `intervalToMs()` — interval string to milliseconds conversion |
+| `mod.ts` | Re-exports engine types for cross-module consumers |
 
 ## Interfaces
 
 All interfaces in `types.ts` — see the file for type definitions.
 
-### Pipeline simulate
-
-```
-Input:  portfolioStrategy, tradingStrategy, klines, coins, config
-Output: PipelineResult
-
-For each bar:
-  1. Discovery outputs candidates
-  2. Portfolio.analyze() → PortfolioDecision
-  3. Trading.plan() → SwapPlan
-  4. Execution.executeSwaps() → positions + capital updated
-```
-
 ## Entry points
 
-- `backtest.ts` — standalone backtest runner
-- `optimize/optimize_parameters.ts` — BOHB hyperparameter optimization
-- `trade.ts` — live trading loop
+- `src/backtest/backtest_strategy.ts` — standalone backtest runner
+- `src/optimize/optimize_parameters.ts` — BOHB hyperparameter optimization
+- `src/trade/trade_account.ts` — live trading loop

@@ -4,7 +4,7 @@
 
 ## Architecture
 
-6-role pipeline executed every trading cycle (1h):
+Pipeline stages executed every trading cycle (1h):
 
 ```
 Discovery → Portfolio → Trading → Execution → Reflection → Logging
@@ -12,17 +12,18 @@ Discovery → Portfolio → Trading → Execution → Reflection → Logging
 
 See per-component AGENTS.md for interface details:
 - [`src/discovery/AGENTS.md`](src/discovery/AGENTS.md) — top-volume coin discovery
-- [`src/portfolio/AGENTS.md`](src/portfolio/AGENTS.md) — want-to-buy/sell assessment + position sizing
-- [`src/trading/AGENTS.md`](src/trading/AGENTS.md) — timing via technical indicators (RSI, MACD, BB, EMA+ADX)
-- [`src/execution/AGENTS.md`](src/execution/AGENTS.md) — simulated or live KuCoin market orders
-- [`src/reflection/AGENTS.md`](src/reflection/AGENTS.md) — decision logging + outcome analysis
-- [`src/communication/AGENTS.md`](src/communication/AGENTS.md) — cycle logging + event journal
-- [`src/hyperband/AGENTS.md`](src/hyperband/AGENTS.md) — standalone BOHB hyperparameter optimizer
-- [`src/optimize/AGENTS.md`](src/optimize/AGENTS.md) — project-aware parameter optimizer
-- [`src/engine/AGENTS.md`](src/engine/AGENTS.md) — pipeline simulate, live engine, shared types
+- [`src/engine/AGENTS.md`](src/engine/AGENTS.md) — pipeline types + live engine
+- [`src/strategy/`](src/strategy/) — trading strategies (RSI, MACD, BB, EMA+ADX, rebalancer)
+- [`src/market/`](src/market/) — market data loading, klines, timeline
+- [`src/backtest/`](src/backtest/) — backtest runner + evaluation
+- [`src/trade/`](src/trade/) — live trading entry point
+- [`src/execution/AGENTS.md`](src/execution/AGENTS.md) — execution stub (planned)
+- [`src/reflection/`](src/reflection/) — decision logging + outcome analysis
 - [`src/position/AGENTS.md`](src/position/AGENTS.md) — portfolio state initialization
 - [`src/registry/AGENTS.md`](src/registry/AGENTS.md) — strategy registration & lookup
 - [`src/kucoin/AGENTS.md`](src/kucoin/AGENTS.md) — KuCoin REST API wrapper
+- [`src/hyperband/AGENTS.md`](src/hyperband/AGENTS.md) — standalone BOHB hyperparameter optimizer
+- [`src/optimize/AGENTS.md`](src/optimize/AGENTS.md) — project-aware parameter optimizer
 
 ## Commands
 
@@ -32,7 +33,7 @@ deno task backtest              # Run pipeline backtest
 deno task optimize              # BOHB parameter optimization
 deno task trade                 # Live trading (dry-run with DRY_RUN=true)
 deno check src/                 # Type-check entire project
-deno task test                      # Run tests
+deno task test                  # Run tests
 ```
 
 ## Environment
@@ -53,14 +54,14 @@ deno task test                      # Run tests
 | **S**ingle Responsibility | Each module has one task. Each strategy has one analysis method. |
 | **O**pen/Closed | New strategies registered via `RoleRegistry.register()` — no existing code changed. |
 | **L**iskov Substitution | All strategies implement the same interface; simulation and live are swappable. |
-| **I**nterface Segregation | Each role has its own interface — no role depends on another role's interface. |
+| **I**nterface Segregation | Each component has its own interface — no component depends on another's interface. |
 | **D**ependency Inversion | Engine depends on abstract interfaces, not concrete strategies. |
 
 ### Conventions
 
 - TypeScript, strict mode, Deno runtime
 - `import type` for type-only imports
-- kebab-case for files, CamelCase for strategy names
+- kebab-case for files, CamelCase for names
 - Tests alongside code: `{name}.test.ts`
 - Cross-module imports go through target module's `mod.ts`
 - Intra-module imports use direct `./file.ts` paths
@@ -69,22 +70,22 @@ deno task test                      # Run tests
 
 ```
 src/
-├── trade.ts              Live entry point
-├── backtest.ts           Backtest entry point
-├── hyperband/            Standalone BOHB optimization algorithm
-├── optimize/             Project-aware parameter optimizer task
-├── config.ts             ROLE_CONFIG — active strategies per role
-├── indicators.ts         Shared indicator functions
-├── engine/               Pipeline simulate + live engine + types
-├── discovery/            Top-volume coin discovery
-├── portfolio/            Rank-trend portfolio strategy
-├── trading/              Technical indicator trading strategies
-├── execution/            Simulated + KuCoin execution
-├── communication/        Logger (silent / line-journal / dashboard)
-├── reflection/           Noop + analyst reflection
-├── position/             Portfolio state loaders (blank + KuCoin)
-├── registry/             RoleRegistry + strategy registration
-├── kucoin/               KuCoin REST API client + types
+├── trade/trade_account.ts    Live entry point
+├── backtest/                 Backtest runner
+│   ├── backtest_strategy.ts  Backtest entry point
+│   ├── mod.ts                Public API
+│   └── evaluator.ts          Result evaluation
+├── hyperband/                Standalone BOHB optimization algorithm
+├── optimize/                 Project-aware parameter optimizer
+├── engine/                   Pipeline types + live engine
+├── discovery/                Top-volume coin discovery
+├── strategy/                 Trading strategies (rsi-timed, macd-timed, bb-timed, ema-adx-timed, rebalancer)
+├── market/                   Market data + timeline
+├── execution/                Execution stub
+├── position/                 Portfolio state loaders (blank + KuCoin)
+├── registry/                 RoleRegistry + strategy registration
+├── kucoin/                   KuCoin REST API client + types
+├── indicators.ts             Shared indicator functions
 data/
-└── klines.json           Cached kline data (generated by deno task testdata)
+└── klines.json               Cached kline data (generated by deno task testdata)
 ```

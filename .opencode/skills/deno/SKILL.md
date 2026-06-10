@@ -12,15 +12,15 @@ description: Modern Deno practices — imports, TypeScript, standard library, an
 
 ## TypeScript
 
-- `strict: true` i `deno.json`
+- `strict: true` in `deno.json`
 - Prefer `type` over `interface` for objects
 - Use `Deno.env.get("KEY")` for environment variables — never `process.env`
 - Async/await over `.then()` — no callbacks unless necessary
 
-## Standardbibliotek (std)
+## Standard library (std)
 
 - `@std/assert` — test assertions
-- `@std/fs` — filsystem (walk, exists, move)
+- `@std/fs` — filesystem (walk, exists, move)
 - `@std/path` — path manipulation
 - `@std/dotenv` — `.env` load
 
@@ -34,16 +34,16 @@ description: Modern Deno practices — imports, TypeScript, standard library, an
 | `deno test` | Test runner — no `jest`/`vitest` |
 | `deno task` | Task runner — no `package.json` scripts |
 
-## Projektstruktur (anbefaling)
+## Project structure (recommended)
 
 ```
 deno.json
 src/
 ├── main.ts           # Entrypoint
 ├── modul/
-│   ├── fil.ts        # Implementation
-│   ├── fil.test.ts   # Test alongside
-│   └── fil.ts        # Public API barrel
+│   ├── file.ts       # Implementation
+│   ├── file.test.ts  # Test alongside
+│   └── mod.ts        # Public API barrel
 dev_deps.ts           # Bundled dev-dependencies (optional)
 ```
 

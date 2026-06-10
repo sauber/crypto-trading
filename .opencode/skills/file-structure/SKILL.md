@@ -12,7 +12,6 @@ Each component is a flat directory under `src/`:
 ```
 src/<component>/
 ├── <file>.ts            # Implementation
-├── <file>.config.ts     # Config constant
 ├── <file>.test.ts       # Test alongside
 ├── types.ts             # Interface definitions
 └── mod.ts               # Barrel export (named exports only)
@@ -31,19 +30,16 @@ src/<component>/
 ## Barrel re-export patterns
 
 ```ts
-// mod.ts — re-export types first, then classes/configs
+// mod.ts — re-export types first, then classes/functions
 export type { TradingStrategy, TradingConfig } from "./types.ts";
-export { RsiTimedTrading } from "./rsi-timed.ts";
-export { config as rsiTimedCfg } from "./rsi-timed.config.ts";
+export { RsiTimed } from "./rsi-timed.ts";
 ```
 
 ## Naming
 
-- Files: camelCase (`rsi-timed.ts`, `rank-trend.ts`)
-- Strategy names: kebab-case (`rsi-timed`, `macd-timed`)
+- Files: kebab-case (`rsi-timed.ts`, `rank-trend.ts`)
+- Names: kebab-case (`rsi-timed`, `macd-timed`)
 - Classes/interfaces: PascalCase
-- Config constants: `config` (renamed on import)
-
 ## Entry-point scripts
 
 CLI entry points that wrap a module's functionality live inside that module's directory.

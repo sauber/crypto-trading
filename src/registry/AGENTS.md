@@ -14,17 +14,11 @@ class RoleRegistry<T> {
 
 ## Registration
 
-`registration.ts` registers all strategies into named registries:
+`registration.ts` registers all strategies into a single `strategyRegistry`:
 
 | Registry | Strategies |
 |----------|------------|
-| `discoveryRegistry` | `testdata`, `kucoin` |
-| `portfolioRegistry` | `rank-trend` |
-| `tradingRegistry` | `rsi-timed`, `macd-timed`, `bb-timed`, `ema-adx-timed` |
-| `executionRegistry` | `simulate`, `kucoin` |
-| `reflectionRegistry` | `noop`, `analyst` |
-
-> Logger is not registered via registry — it's passed directly to engine factories.
+| `strategyRegistry` | `rebalancer`, `rsi-timed`, `macd-timed`, `bb-timed`, `ema-adx-timed` |
 
 ## OCP
 

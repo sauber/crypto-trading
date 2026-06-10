@@ -2,7 +2,10 @@
 
 Execute swap plans as simulated or live KuCoin market orders.
 
-## Interface
+> **Stub** — execution strategies are planned but not yet implemented.
+> Currently, order execution is handled inline in `src/engine/live.ts`.
+
+## Interface (planned)
 
 ```ts
 interface ExecutionStrategy {
@@ -11,7 +14,7 @@ interface ExecutionStrategy {
 }
 ```
 
-## Strategies
+## Strategies (planned)
 
 | Name | File | Description |
 |------|------|-------------|
